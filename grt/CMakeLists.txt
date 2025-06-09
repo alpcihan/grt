@@ -139,7 +139,7 @@ function(create_sample  PROJECT_NAME)
     )
 
     # Readme 
-    target_sources(${EXECUTABLE_NAME} PRIVATE ${SAMPLE_FOLDER}/README.md)
+    # target_sources(${EXECUTABLE_NAME} PRIVATE ${SAMPLE_FOLDER}/README.md)
 
     # Include paths
     target_include_directories(${EXECUTABLE_NAME} PRIVATE ${SAMPLES_ROOT_DIR} ${SAMPLE_FOLDER})
@@ -240,6 +240,8 @@ endfunction()
 # Sub examples
 add_subdirectory(common)
 add_subdirectory(samples)
+add_subdirectory(src)
+
 
 #--------------------------------------------------------------------------------------------------
 # Install - copying the media directory
@@ -254,7 +256,7 @@ install(DIRECTORY "media" CONFIGURATIONS Debug DESTINATION "bin_${ARCH}_debug")
 # Fake project to add files
 set(EXTRAFILES 
   CMakeLists.txt 
-  README.md
+  # README.md
   # test.py
   cmake/hlsl.cmake
   cmake/slang.cmake
