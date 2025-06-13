@@ -1,39 +1,3 @@
-/*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-//////////////////////////////////////////////////////////////////////////
-/*
-
-  This sample raytraces a scene made of multiple primitives. 
-  - The scene is created in createScene()
-  - Then Vulkan buffers holding the scene are created in createVkBuffers()
-  - Bottom and Top level acceleration structures are using the Vulkan buffers 
-    and scene description in createBottomLevelAS() and createTopLevelAS()
-  - The raytracing pipeline, composed of RayGen, Miss, ClosestHit shaders
-    and the creation of the shading binding table, is done in createRtxPipeline()
-  - Rendering is done in onRender()
-
-
-*/
-//////////////////////////////////////////////////////////////////////////
-
-
 #define IMGUI_DEFINE_MATH_OPERATORS  // ImGUI ImVec maths
 
 #include "common/vk_context.hpp"                    // Vulkan context creation
@@ -62,23 +26,12 @@ using namespace glm;
 }  // namespace DH
 
 // Local shaders
-#if USE_HLSL
-#include "_autogen/raytrace_rgenMain.spirv.h"
-#include "_autogen/raytrace_rchitMain.spirv.h"
-#include "_autogen/raytrace_rmissMain.spirv.h"
-const auto& rgen_shd  = std::vector<char>{std::begin(raytrace_rgenMain), std::end(raytrace_rgenMain)};
-const auto& rchit_shd = std::vector<char>{std::begin(raytrace_rchitMain), std::end(raytrace_rchitMain)};
-const auto& rmiss_shd = std::vector<char>{std::begin(raytrace_rmissMain), std::end(raytrace_rmissMain)};
-#elif USE_SLANG
-#include "_autogen/raytrace_slang.h"
-#else
 #include "_autogen/raytrace.rchit.glsl.h"
 #include "_autogen/raytrace.rgen.glsl.h"
 #include "_autogen/raytrace.rmiss.glsl.h"
 const auto& rgen_shd  = std::vector<uint32_t>{std::begin(raytrace_rgen_glsl), std::end(raytrace_rgen_glsl)};
 const auto& rchit_shd = std::vector<uint32_t>{std::begin(raytrace_rchit_glsl), std::end(raytrace_rchit_glsl)};
 const auto& rmiss_shd = std::vector<uint32_t>{std::begin(raytrace_rmiss_glsl), std::end(raytrace_rmiss_glsl)};
-#endif
 
 // The maximum depth recursion for the ray tracer
 uint32_t MAXRAYRECURSIONDEPTH = 10;
@@ -509,18 +462,7 @@ private:
     std::array<VkPipelineShaderStageCreateInfo, eShaderGroupCount> stages{};
     for(auto& s : stages)
       s.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-#if USE_SLANG
-    VkShaderModule shaderModule = nvvk::createShaderModule(m_device, &raytraceSlang[0], sizeof(raytraceSlang));
-    stages[eRaygen].module      = shaderModule;
-    stages[eRaygen].pName       = "rgenMain";
-    stages[eRaygen].stage       = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-    stages[eMiss].module        = shaderModule;
-    stages[eMiss].pName         = "rmissMain";
-    stages[eMiss].stage         = VK_SHADER_STAGE_MISS_BIT_KHR;
-    stages[eClosestHit].module  = shaderModule;
-    stages[eClosestHit].pName   = "rchitMain";
-    stages[eClosestHit].stage   = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-#else
+
     stages[eRaygen].module     = nvvk::createShaderModule(m_device, rgen_shd);
     stages[eRaygen].pName      = USE_HLSL ? "rgenMain" : "main";
     stages[eRaygen].stage      = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
@@ -530,7 +472,6 @@ private:
     stages[eClosestHit].module = nvvk::createShaderModule(m_device, rchit_shd);
     stages[eClosestHit].pName  = USE_HLSL ? "rchitMain" : "main";
     stages[eClosestHit].stage  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-#endif
 
     m_dutil->setObjectName(stages[eRaygen].module, "Raygen");
     m_dutil->setObjectName(stages[eMiss].module, "Miss");
@@ -593,12 +534,9 @@ private:
     m_sbt.create(p.plines[0], ray_pipeline_info);
 
     // Removing temp modules
-#if USE_SLANG
-    vkDestroyShaderModule(m_device, shaderModule, nullptr);
-#else
     for(const VkPipelineShaderStageCreateInfo& s : stages)
       vkDestroyShaderModule(m_device, s.module, nullptr);
-#endif
+
   }
 
   void writeRtDesc()
@@ -741,11 +679,6 @@ int main(int argc, char** argv)
   vkSetup.deviceExtensions.push_back({VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, &rt_pipeline_feature});  // To use vkCmdTraceRaysKHR
   vkSetup.deviceExtensions.push_back({VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME});  // Required by ray tracing pipeline
   vkSetup.deviceExtensions.push_back({VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME});  // Require for Undockable Viewport
-
-#if USE_HLSL || USE_SLANG  // DXC is automatically adding the extension
-  VkPhysicalDeviceRayQueryFeaturesKHR rayqueryFeature{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
-  vkSetup.deviceExtensions.push_back({VK_KHR_RAY_QUERY_EXTENSION_NAME, &rayqueryFeature});
-#endif  // USE_HLSL
 
 #if(VK_HEADER_VERSION >= 283)
   // To enable ray tracing validation, set the NV_ALLOW_RAYTRACING_VALIDATION=1 environment variable
