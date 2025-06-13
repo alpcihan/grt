@@ -248,21 +248,13 @@ private:
       n.translation = glm::vec3(-(static_cast<float>(numMeshes) / 2.F) + static_cast<float>(i), 0.F, 0.F);
     }
 
-    // Adding a plane & material
-    m_materials.push_back({glm::vec4(.7F, .7F, .7F, 1.0F)});
-    m_meshes.emplace_back(nvh::createPlane(10, 100, 100));
-    nvh::Node& n  = m_nodes.emplace_back();
-    n.mesh        = static_cast<int>(m_meshes.size()) - 1;
-    n.material    = static_cast<int>(m_materials.size()) - 1;
-    n.translation = {0, -1, 0};
-
     // Setting camera to see the scene
     CameraManip.setClipPlanes({0.1F, 100.0F});
     CameraManip.setLookat({-0.5F, 0.0F, 5.0F}, {-0.5F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F});
 
     // Default parameters for overall material
     m_pushConst.intensity = 5.0F;
-    m_pushConst.maxDepth  = 5;
+    m_pushConst.maxDepth  = 1;
     m_pushConst.roughness = 0.2F;
     m_pushConst.metallic  = 0.3F;
 

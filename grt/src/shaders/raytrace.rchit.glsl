@@ -93,29 +93,6 @@ HitState getHitState(int meshID, vec3 barycentrics)
   return hit;
 }
 
-//-----------------------------------------------------------------------
-// Return TRUE if there is no occluder, meaning that the light is visible from P toward L
-bool shadowRay(vec3 P, vec3 L)
-{
-  const uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT | gl_RayFlagsCullBackFacingTrianglesEXT;
-  HitPayload savedP = payload;
-  traceRayEXT(topLevelAS, rayFlags, 0xFF, 0, 0, 0, P, 0.0001, L, 100.0, 0);
-  bool visible = (payload.depth == MISS_DEPTH);
-  payload      = savedP;
-  return visible;
-}
-
-
-vec3 ggxEvaluate(vec3 V, vec3 L, PbrMaterial mat)
-{
-  BsdfEvaluateData data;
-  data.k1 = V;
-  data.k2 = L;
-
-  bsdfEvaluateSimple(data, mat);
-
-  return data.bsdf_glossy + data.bsdf_diffuse;
-}
 
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
@@ -127,7 +104,6 @@ void main()
 
   // Vector to the light
   vec3 L       = normalize(skyInfo.directionToLight);
-  bool visible = shadowRay(P, L);
 
   // Retrieve the Instance buffer information
   InstanceInfo iInfo = instanceInfo.i[gl_InstanceID];
@@ -147,13 +123,7 @@ void main()
   // material model!
 
   // Direct lighting
-  vec3 color = ggxEvaluate(V, L, mat);
-  // If we're shadowed, artistically dim the light.
-  if(!visible)
-  {
-    color *= vec3(0.3f);
-  }
-  payload.color += color * payload.weight * pc.intensity;
+  payload.color = mat.baseColor;
 
   // Ad-hoc reflection weight to incorporate how
   // * baseColor affects f0 when the material is metal
