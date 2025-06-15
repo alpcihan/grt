@@ -20,6 +20,8 @@
 
 #include "grt_model.h"
 
+#include <glm/gtx/quaternion.hpp>
+
 namespace DH {
 using namespace glm;
 #include "shaders/device_host.h"  // Shared between host and device
@@ -181,13 +183,7 @@ private:
     nvh::ScopedTimer st(__FUNCTION__);
 
     // Meshes
-    m_meshes.emplace_back(nvh::createSphereUv(0.5f, 200, 200));
-    m_meshes.emplace_back(nvh::createCube(0.7f, 0.7f, 0.7f));
-    m_meshes.emplace_back(nvh::createTetrahedron());
-    m_meshes.emplace_back(nvh::createOctahedron());
     m_meshes.emplace_back(nvh::createIcosahedron());
-    m_meshes.emplace_back(nvh::createConeMesh(.5f, 1.0f, 100));
-    m_meshes.emplace_back(nvh::createTorusMesh(.25f, .15f, 100, 100));
     const int numMeshes = static_cast<int>(m_meshes.size());
 
     // Instances
@@ -376,17 +372,25 @@ private:
   {
     nvh::ScopedTimer st(__FUNCTION__);
 
+    const int N = m_model.N; 
+    const int meshIdx = 0;
     std::vector<VkAccelerationStructureInstanceKHR> tlasInstances;
-    tlasInstances.reserve(m_nodes.size());
-    for(const nvh::Node& node : m_nodes)
+    tlasInstances.reserve(N);
+
+    for(int i=0; i<N;i++)
     {
+      glm::mat4 T = glm::translate(glm::mat4(1.0f), m_model.positions[i]);    // translation
+      glm::mat4 R = glm::toMat4(glm::quat(m_model.rotations[i]));             // rotation matrix from quaternion
+      glm::mat4 S = glm::scale(glm::mat4(1.0f), m_model.scales[i] * 0.01f);           // scale
+      glm::mat4 transform = T * R * S;  // Model matrix
+
       VkAccelerationStructureInstanceKHR ray_inst{
-          .transform           = nvvk::toTransformMatrixKHR(node.localMatrix()),  // Position of the instance
-          .instanceCustomIndex = static_cast<uint32_t>(node.mesh),                // gl_InstanceCustomIndexEX
-          .mask                = 0xFF,                                            // All objects
-          .instanceShaderBindingTableRecordOffset = 0,  // We will use the same hit group for all object
+          .transform           = nvvk::toTransformMatrixKHR(transform),  // Position of the instance
+          .instanceCustomIndex = static_cast<uint32_t>(meshIdx),         // gl_InstanceCustomIndexEX
+          .mask                = 0xFF,                                   // All objects
+          .instanceShaderBindingTableRecordOffset = 0,                   // We will use the same hit group for all object
           .flags                                  = 0,
-          .accelerationStructureReference         = m_blas[node.mesh].address,
+          .accelerationStructureReference         = m_blas[meshIdx].address,
       };
       tlasInstances.emplace_back(ray_inst);
     }

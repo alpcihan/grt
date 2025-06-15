@@ -120,7 +120,6 @@
  [shader("closesthit")]
  void rchitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
-  /*
    float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
    uint instanceID = InstanceIndex();
    uint meshID = InstanceID();
@@ -133,37 +132,20 @@
  
    // Material info
    InstanceInfo iInfo = instanceInfo[instanceID];
-   float3 albedo = materials[iInfo.materialID].xyz;
+   float3 albedo = albedos[instanceID].xyz;
  
    // Hit information: position, normal, geo normal
    HitState hitState = getHitState(meshID, primitiveID, barycentrics);
  
    // Color at hit point
    PbrMaterial mat = defaultPbrMaterial(albedo, pushConst.metallic, pushConst.roughness, hitState.nrm, hitState.geonrm);
-   float3 color = ggxEvaluate(V, L, mat);
- 
+
    // Add contribution
-   payload.color += color * pushConst.intensity * payload.weight;
+   payload.color = albedo;
  
    // Recursive bounce
    payload.depth += 1;
    payload.weight *= pushConst.metallic; // more or less reflective
- 
-   // We hit our max depth
-   if (payload.depth < pushConst.maxDepth)
-   {
-       // Reflection
-       float3 refl_dir = reflect(D, hitState.nrm);
-
-       // Trace bouncing ray
-       RayDesc ray;
-       ray.Origin = hitState.pos;
-       ray.Direction = refl_dir;
-       ray.TMin = 0.001;
-       ray.TMax = INFINITE;
-       TraceRay(topLevelAS, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, payload);
-   }
-    */
  }
 
  //-----------------------------------------------------------------------
@@ -172,9 +154,6 @@
  [shader("anyhit")]
  void rahitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
-    payload.color += float3(0.1, 0, 0); // Ignore this hit
-    payload.count++;
-    IgnoreHit();
  }
  
  //-----------------------------------------------------------------------
