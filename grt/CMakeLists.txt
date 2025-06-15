@@ -73,7 +73,7 @@ set(USE_SLANG OFF)
 
 # Define the available choices for shader languages
 set(CHOICES "GLSL" "HLSL" "SLANG")
-set(USE_SHADER_LANGUAGE "GLSL" CACHE STRING "Choose the shading language to use.")
+set(USE_SHADER_LANGUAGE "SLANG" CACHE STRING "Choose the shading language to use.")
 set_property(CACHE USE_SHADER_LANGUAGE PROPERTY STRINGS ${CHOICES}) # Provide the choices to the user in the CMake GUI
 if(USE_SHADER_LANGUAGE STREQUAL "GLSL")
    set(USE_GLSL ON)
