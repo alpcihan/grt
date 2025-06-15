@@ -1,0 +1,4 @@
+[submodule "threedgrt_tracer/dependencies/optix-dev"]
+	path = threedgrt_tracer/dependencies/optix-dev
+	url = https://github.com/NVIDIA/optix-dev.git
+	branch = v7.5.0
