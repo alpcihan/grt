@@ -3,102 +3,147 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <glm/glm.hpp>
 
-class GRTModel {
+// Struct for 45-element vector
+struct Vec45
+{
+    float r[45];
+
+    float &operator[](size_t i) { return r[i]; }
+    const float &operator[](size_t i) const { return r[i]; }
+};
+
+class GRTModel
+{
 public:
-    GRTModel(const std::string& path, bool printInfo = false) {
-        load(path, printInfo);
+    GRTModel(const std::string &path, bool printInfo = false)
+    {
+        _load(path, printInfo);
     }
 
-    // Member variables
     int N = 0;
-    int pos_dim = 0, scale_dim = 0, rotate_dim = 0;
-    int albedo_dim = 0, specular_dim = 0, density_dim = 0;
+    int pos_dim = 0, scales_dim = 0, rotations_dim = 0;
+    int albedo_dim = 0, specular_dim = 0, densities_dim = 0;
 
-    std::vector<float> position;
-    std::vector<float> scale;
-    std::vector<float> rotate;
-    std::vector<float> features_albedo;
-    std::vector<float> features_specular;
-    std::vector<float> density;
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> scales;
+    std::vector<glm::vec4> rotations;
+    std::vector<glm::vec3> features_albedo;
+    std::vector<Vec45> features_specular;
+    std::vector<float> densities;
 
 private:
-    void load(const std::string& filepath, bool printInfo) {
+    void _load(const std::string &filepath, bool printInfo)
+    {
         std::ifstream fin(filepath, std::ios::binary);
-        if (!fin) {
+        if (!fin)
+        {
             std::cerr << "Failed to open file: " << filepath << "\n";
             return;
         }
 
         int header[7];
-        fin.read(reinterpret_cast<char*>(header), 7 * sizeof(int));
-        if (fin.gcount() != 7 * sizeof(int)) {
+        fin.read(reinterpret_cast<char *>(header), 7 * sizeof(int));
+        if (fin.gcount() != 7 * sizeof(int))
+        {
             std::cerr << "Failed to read header.\n";
             return;
         }
 
         N = header[0];
         pos_dim = header[1];
-        scale_dim = header[2];
-        rotate_dim = header[3];
+        scales_dim = header[2];
+        rotations_dim = header[3];
         albedo_dim = header[4];
         specular_dim = header[5];
-        density_dim = header[6];
+        densities_dim = header[6];
 
-        if (printInfo) {
-            std::cout << "Shapes:\n";
-            std::cout << "N: " << N << "\n";
-            std::cout << "position shape: (" << N << ", " << pos_dim << ")\n";
-            std::cout << "scale shape: (" << N << ", " << scale_dim << ")\n";
-            std::cout << "rotate shape: (" << N << ", " << rotate_dim << ")\n";
-            std::cout << "features_albedo shape: (" << N << ", " << albedo_dim << ")\n";
-            std::cout << "features_specular shape: (" << N << ", " << specular_dim << ")\n";
-            std::cout << "density shape: (" << N << ", " << density_dim << ")\n";
-            std::cout << std::endl;
-        }
-
-        auto readTensor = [&](int rows, int cols, std::vector<float>& vec) {
-            size_t count = size_t(rows) * cols;
-            vec.resize(count);
-            fin.read(reinterpret_cast<char*>(vec.data()), count * sizeof(float));
-            if (fin.gcount() != static_cast<std::streamsize>(count * sizeof(float))) {
-                std::cerr << "Failed to read tensor data\n";
-                vec.clear();
+        // Read helpers
+        auto readVec3 = [&](std::vector<glm::vec3> &vec)
+        {
+            vec.resize(N);
+            for (int i = 0; i < N; ++i)
+            {
+                float buffer[3];
+                fin.read(reinterpret_cast<char *>(buffer), 3 * sizeof(float));
+                vec[i] = glm::vec3(buffer[0], buffer[1], buffer[2]);
             }
         };
 
-        readTensor(N, pos_dim, position);
-        readTensor(N, scale_dim, scale);
-        readTensor(N, rotate_dim, rotate);
-        readTensor(N, albedo_dim, features_albedo);
-        readTensor(N, specular_dim, features_specular);
-        readTensor(N, density_dim, density);
+        auto readVec4 = [&](std::vector<glm::vec4> &vec)
+        {
+            vec.resize(N);
+            for (int i = 0; i < N; ++i)
+            {
+                float buffer[4];
+                fin.read(reinterpret_cast<char *>(buffer), 4 * sizeof(float));
+                vec[i] = glm::vec4(buffer[0], buffer[1], buffer[2], buffer[3]);
+            }
+        };
 
-        if (printInfo) {
-            auto printFirstLast = [](const std::string& name, const std::vector<float>& data, int dim) {
-                if (data.empty()) return;
-                std::cout << name << " first element: [";
-                for (int i = 0; i < dim; ++i) {
-                    std::cout << data[i];
-                    if (i < dim - 1) std::cout << ", ";
-                }
-                std::cout << "]\n";
+        auto readVec45 = [&](std::vector<Vec45> &vec)
+        {
+            vec.resize(N);
+            for (int i = 0; i < N; ++i)
+            {
+                fin.read(reinterpret_cast<char *>(vec[i].r), 45 * sizeof(float));
+            }
+        };
 
-                std::cout << name << " last element:  [";
-                size_t start = data.size() - dim;
-                for (int i = 0; i < dim; ++i) {
-                    std::cout << data[start + i];
-                    if (i < dim - 1) std::cout << ", ";
-                }
-                std::cout << "]\n\n";
-            };
+        auto readFloat = [&](std::vector<float> &vec)
+        {
+            vec.resize(N);
+            fin.read(reinterpret_cast<char *>(vec.data()), N * sizeof(float));
+        };
 
-            printFirstLast("position", position, pos_dim);
-            printFirstLast("scale", scale, scale_dim);
-            printFirstLast("rotate", rotate, rotate_dim);
-            printFirstLast("features_albedo", features_albedo, albedo_dim);
-            printFirstLast("features_specular", features_specular, specular_dim);
-            printFirstLast("density", density, density_dim);
+        // Read all tensors
+        readVec3(positions);
+        readVec3(scales);
+        readVec4(rotations);
+        readVec3(features_albedo);
+        readVec45(features_specular);
+        readFloat(densities);
+
+        if (printInfo)
+        {
+            _printInfo();
         }
+    }
+
+    void _printInfo() const
+    {
+        std::cout << "Shapes:\n";
+        std::cout << "N: " << N << "\n";
+        std::cout << "positions shape: (" << N << ", " << pos_dim << ")\n";
+        std::cout << "scales shape: (" << N << ", " << scales_dim << ")\n";
+        std::cout << "rotations shape: (" << N << ", " << rotations_dim << ")\n";
+        std::cout << "features_albedo shape: (" << N << ", " << albedo_dim << ")\n";
+        std::cout << "features_specular shape: (" << N << ", " << specular_dim << ")\n";
+        std::cout << "densities shape: (" << N << ", " << densities_dim << ")\n\n";
+
+        auto printFirstLast = [](const std::string &name, const auto &vec, int dim)
+        {
+            if (vec.empty())
+                return;
+
+            std::cout << name << " first: [";
+            for (int i = 0; i < dim; ++i)
+                std::cout << vec[0][i] << (i < dim - 1 ? ", " : "");
+            std::cout << "]\n";
+
+            std::cout << name << " last:  [";
+            for (int i = 0; i < dim; ++i)
+                std::cout << vec.back()[i] << (i < dim - 1 ? ", " : "");
+            std::cout << "]\n\n";
+        };
+
+        printFirstLast("positions", positions, 3);
+        printFirstLast("scales", scales, 3);
+        printFirstLast("rotations", rotations, 4);
+        printFirstLast("features_albedo", features_albedo, 3);
+        printFirstLast("features_specular", features_specular, 45);
+        std::cout << "densities first: " << densities[0] << "\n";
+        std::cout << "densities last:  " << densities.back() << "\n";
     }
 };
