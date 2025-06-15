@@ -384,7 +384,7 @@ private:
     {
       glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(m_model.positions[i].x, m_model.positions[i].z, -m_model.positions[i].y));
       glm::mat4 R = glm::toMat4(glm::quat(m_model.rotations[i]));                   // rotation matrix from quaternion
-      glm::mat4 S = glm::scale(glm::mat4(1.0f), m_model.scales[i] * 0.005f);           // scale
+      glm::mat4 S = glm::scale(glm::mat4(1.0f), m_model.scales[i] * 0.01f);           // scale
       glm::mat4 transform = T * R * S;  // Model matrix
 
       VkAccelerationStructureInstanceKHR ray_inst{
