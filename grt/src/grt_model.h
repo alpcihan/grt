@@ -29,8 +29,8 @@ public:
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> scales;
     std::vector<glm::vec4> rotations;
-    std::vector<glm::vec3> features_albedo;
-    std::vector<Vec45> features_specular;
+    std::vector<glm::vec3> albedos;
+    std::vector<Vec45> speculars;
     std::vector<float> densities;
 
 private:
@@ -101,8 +101,8 @@ private:
         readVec3(positions);
         readVec3(scales);
         readVec4(rotations);
-        readVec3(features_albedo);
-        readVec45(features_specular);
+        readVec3(albedos);
+        readVec45(speculars);
         readFloat(densities);
 
         if (printInfo)
@@ -118,8 +118,8 @@ private:
         std::cout << "positions shape: (" << N << ", " << pos_dim << ")\n";
         std::cout << "scales shape: (" << N << ", " << scales_dim << ")\n";
         std::cout << "rotations shape: (" << N << ", " << rotations_dim << ")\n";
-        std::cout << "features_albedo shape: (" << N << ", " << albedo_dim << ")\n";
-        std::cout << "features_specular shape: (" << N << ", " << specular_dim << ")\n";
+        std::cout << "albedos shape: (" << N << ", " << albedo_dim << ")\n";
+        std::cout << "speculars shape: (" << N << ", " << specular_dim << ")\n";
         std::cout << "densities shape: (" << N << ", " << densities_dim << ")\n\n";
 
         auto printFirstLast = [](const std::string &name, const auto &vec, int dim)
@@ -141,8 +141,8 @@ private:
         printFirstLast("positions", positions, 3);
         printFirstLast("scales", scales, 3);
         printFirstLast("rotations", rotations, 4);
-        printFirstLast("features_albedo", features_albedo, 3);
-        printFirstLast("features_specular", features_specular, 45);
+        printFirstLast("albedos", albedos, 3);
+        printFirstLast("speculars", speculars, 45);
         std::cout << "densities first: " << densities[0] << "\n";
         std::cout << "densities last:  " << densities.back() << "\n";
     }

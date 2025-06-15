@@ -18,6 +18,7 @@
 #include "nvvkhl/sky.hpp"                           // Sun & Sky
 #include "nvvk/renderpasses_vk.hpp"
 
+#include "grt_model.h"
 
 namespace DH {
 using namespace glm;
@@ -52,7 +53,7 @@ uint32_t MAXRAYRECURSIONDEPTH = 10;
 class Raytracing : public nvvkhl::IAppElement
 {
 public:
-  Raytracing()           = default;
+  Raytracing(): m_model("/home/alp/Desktop/grt/grt/src/_data/data.bin"){}
   ~Raytracing() override = default;
 
   void onAttach(nvvkhl::Application* app) override
@@ -175,14 +176,6 @@ public:
   }
 
 private:
-  glm::vec4 nextColor()
-  {
-    static float    index = 1.0F;
-    const glm::vec3 freq  = glm::vec3(1.33333F, 2.33333F, 3.33333F) * index;
-    const glm::vec3 v     = static_cast<glm::vec3>(sin(freq) * 0.5F + 0.5F);
-    index += 0.707F;
-    return {v, 1};
-  }
   void createScene()
   {
     nvh::ScopedTimer st(__FUNCTION__);
@@ -197,12 +190,6 @@ private:
     m_meshes.emplace_back(nvh::createTorusMesh(.25f, .15f, 100, 100));
     const int numMeshes = static_cast<int>(m_meshes.size());
 
-    // Materials (colorful)
-    for(int i = 0; i < numMeshes; i++)
-    {
-      m_materials.push_back({nextColor()});
-    }
-
     // Instances
     for(int i = 0; i < numMeshes; i++)
     {
@@ -211,14 +198,6 @@ private:
       n.material    = i;
       n.translation = glm::vec3(-(static_cast<float>(numMeshes) / 2.F) + static_cast<float>(i), 0.F, 0.F);
     }
-
-    // Adding a plane & material
-    m_materials.push_back({glm::vec4(.7F, .7F, .7F, 1.0F)});
-    m_meshes.emplace_back(nvh::createPlane(10, 100, 100));
-    nvh::Node& n  = m_nodes.emplace_back();
-    n.mesh        = static_cast<int>(m_meshes.size()) - 1;
-    n.material    = static_cast<int>(m_materials.size()) - 1;
-    n.translation = {0, -1, 0};
 
     // Setting camera to see the scene
     CameraManip.setClipPlanes({0.1F, 100.0F});
@@ -278,7 +257,7 @@ private:
         m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bInstInfoBuffer.buffer);
 
-    m_bMaterials = m_alloc->createBuffer(cmd, m_materials, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_bMaterials = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bMaterials.buffer);
 
     m_app->submitAndWaitTempCmdBuffer(cmd);
@@ -460,7 +439,7 @@ private:
     m_rtSet->addBinding(B_frameInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_sceneDesc, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_skyParam, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL);
-    m_rtSet->addBinding(B_materials, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_albedos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_instances, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_vertex, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
@@ -606,7 +585,7 @@ private:
     writes.emplace_back(m_rtSet->makeWrite(0, B_outImage, &image_info));
     writes.emplace_back(m_rtSet->makeWrite(0, B_frameInfo, &dbi_unif));
     writes.emplace_back(m_rtSet->makeWrite(0, B_skyParam, &dbi_sky));
-    writes.emplace_back(m_rtSet->makeWrite(0, B_materials, &mat_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_albedos, &mat_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_instances, &inst_desc));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_vertex, vertex_desc.data()));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_index, index_desc.data()));
@@ -672,13 +651,8 @@ private:
   nvvk::AccelKHR              m_tlas;  // Top-level AS
 
   // Data and setting
-  struct Material
-  {
-    glm::vec4 color{1.F};
-  };
   std::vector<nvh::PrimitiveMesh> m_meshes;
   std::vector<nvh::Node>          m_nodes;
-  std::vector<Material>           m_materials;
 
   // Pipeline
   DH::PushConstant m_pushConst{};  // Information sent to the shader
@@ -686,6 +660,9 @@ private:
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
   nvvk::SBTWrapper          m_sbt;     // Shading binding table wrapper
   nvvkhl::PipelineContainer m_rtPipe;  // Hold pipelines and layout
+
+  // Model
+  GRTModel m_model;
 };
 
 

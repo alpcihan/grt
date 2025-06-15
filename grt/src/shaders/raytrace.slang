@@ -1,22 +1,3 @@
-/*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0
- */
-
  #version 460
 
  #include "common/shaders/constants.hlsli"
@@ -33,7 +14,7 @@
  [[vk::binding(B_outImage)]] RWTexture2D<float4> outImage;
  [[vk::binding(B_frameInfo)]] ConstantBuffer<FrameInfo> frameInfo;
  [[vk::binding(B_skyParam)]] ConstantBuffer<SimpleSkyParameters> skyInfo;
- [[vk::binding(B_materials)]] StructuredBuffer<float4> materials;
+ [[vk::binding(B_albedos)]] StructuredBuffer<float3> albedos;
  [[vk::binding(B_instances)]] StructuredBuffer<InstanceInfo> instanceInfo;
  [[vk::binding(B_vertex)]] StructuredBuffer<Vertex> vertices[];
  [[vk::binding(B_index)]] StructuredBuffer<uint3> indices[];
@@ -47,6 +28,7 @@
    float3 color;
    float weight;
    int depth;
+   int count;
  };
  
  
@@ -102,9 +84,9 @@
  {
    float2 launchID = (float2)DispatchRaysIndex().xy;
    float2 launchSize = (float2)DispatchRaysDimensions().xy;
- 
+
    const uint rayFlags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-   const float2 clipCoords = launchID / launchSize * 2.0 - 1.0;
+   const float2 clipCoords = (launchID + 0.5) / launchSize * 2.0 - 1.0;
    const float4 viewCoords = mul(frameInfo.projInv, float4(clipCoords, 1.0, 1.0));
  
    RayDesc ray;
@@ -119,6 +101,7 @@
    payload.color = float3(0, 0, 0);
    payload.weight = 1;
    payload.depth = 0;
+   payload.count = 0;
  
    TraceRay(topLevelAS, rayFlags, 0xff, 0, 0, 0, ray, payload);
    float3 color = payload.color;
@@ -137,6 +120,7 @@
  [shader("closesthit")]
  void rchitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
+  /*
    float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
    uint instanceID = InstanceIndex();
    uint meshID = InstanceID();
@@ -179,6 +163,7 @@
        ray.TMax = INFINITE;
        TraceRay(topLevelAS, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, payload);
    }
+    */
  }
 
  //-----------------------------------------------------------------------
@@ -187,7 +172,9 @@
  [shader("anyhit")]
  void rahitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
-
+    payload.color += float3(0.1, 0, 0); // Ignore this hit
+    payload.count++;
+    IgnoreHit();
  }
  
  //-----------------------------------------------------------------------
