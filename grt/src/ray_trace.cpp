@@ -253,8 +253,11 @@ private:
         m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bInstInfoBuffer.buffer);
 
-    m_bMaterials = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
-    m_dutil->DBG_NAME(m_bMaterials.buffer);
+    m_bAlbedos = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_dutil->DBG_NAME(m_bAlbedos.buffer);
+
+    m_bDensities = m_alloc->createBuffer(cmd, m_model.densities, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_dutil->DBG_NAME(m_bDensities.buffer);
 
     m_app->submitAndWaitTempCmdBuffer(cmd);
   }
@@ -444,6 +447,7 @@ private:
     m_rtSet->addBinding(B_sceneDesc, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_skyParam, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_albedos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_densities, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_instances, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_vertex, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
@@ -571,7 +575,8 @@ private:
     const VkDescriptorImageInfo  image_info{{}, m_gBuffers->getColorImageView(), VK_IMAGE_LAYOUT_GENERAL};
     const VkDescriptorBufferInfo dbi_unif{m_bFrameInfo.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo dbi_sky{m_bSkyParams.buffer, 0, VK_WHOLE_SIZE};
-    const VkDescriptorBufferInfo mat_desc{m_bMaterials.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo albedos_desc{m_bAlbedos.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo densities_desc{m_bDensities.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo inst_desc{m_bInstInfoBuffer.buffer, 0, VK_WHOLE_SIZE};
 
     std::vector<VkDescriptorBufferInfo> vertex_desc;
@@ -589,7 +594,8 @@ private:
     writes.emplace_back(m_rtSet->makeWrite(0, B_outImage, &image_info));
     writes.emplace_back(m_rtSet->makeWrite(0, B_frameInfo, &dbi_unif));
     writes.emplace_back(m_rtSet->makeWrite(0, B_skyParam, &dbi_sky));
-    writes.emplace_back(m_rtSet->makeWrite(0, B_albedos, &mat_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_albedos, &albedos_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_densities, &densities_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_instances, &inst_desc));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_vertex, vertex_desc.data()));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_index, index_desc.data()));
@@ -606,7 +612,8 @@ private:
     }
     m_alloc->destroy(m_bFrameInfo);
     m_alloc->destroy(m_bInstInfoBuffer);
-    m_alloc->destroy(m_bMaterials);
+    m_alloc->destroy(m_bAlbedos);
+    m_alloc->destroy(m_bDensities);
     m_alloc->destroy(m_bSkyParams);
 
     m_rtSet->deinit();
@@ -648,7 +655,8 @@ private:
   std::vector<PrimitiveMeshVk> m_bMeshes;  // Each primitive holds a buffer of vertices and indices
   nvvk::Buffer                 m_bFrameInfo;
   nvvk::Buffer                 m_bInstInfoBuffer;
-  nvvk::Buffer                 m_bMaterials;
+  nvvk::Buffer                 m_bAlbedos;
+  nvvk::Buffer                 m_bDensities;
   nvvk::Buffer                 m_bSkyParams;
 
   std::vector<nvvk::AccelKHR> m_blas;  // Bottom-level AS

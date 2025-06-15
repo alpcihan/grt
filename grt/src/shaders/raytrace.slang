@@ -15,6 +15,7 @@
  [[vk::binding(B_frameInfo)]] ConstantBuffer<FrameInfo> frameInfo;
  [[vk::binding(B_skyParam)]] ConstantBuffer<SimpleSkyParameters> skyInfo;
  [[vk::binding(B_albedos)]] StructuredBuffer<float3> albedos;
+ [[vk::binding(B_densities)]] StructuredBuffer<float> densities;
  [[vk::binding(B_instances)]] StructuredBuffer<InstanceInfo> instanceInfo;
  [[vk::binding(B_vertex)]] StructuredBuffer<Vertex> vertices[];
  [[vk::binding(B_index)]] StructuredBuffer<uint3> indices[];
@@ -36,48 +37,13 @@
  // Hit state information
  struct HitState
  {
-   float3 pos;
-   float3 nrm;
-   float3 geonrm;
+    int particleId;
+    float distance;
  };
  
+ 
  //-----------------------------------------------------------------------
- // Return hit position, normal and geometric normal in world space
- HitState getHitState(int meshID, int primitiveID, float3 barycentrics)
- {
-   HitState hit;
- 
-   // Getting the 3 indices of the triangle (local)
-   uint3 triangleIndex = indices[NonUniformResourceIndex(meshID)][primitiveID];
- 
-   // All vertex attributes of the triangle.
-   Vertex v0 = vertices[NonUniformResourceIndex(meshID)][triangleIndex.x];
-   Vertex v1 = vertices[NonUniformResourceIndex(meshID)][triangleIndex.y];
-   Vertex v2 = vertices[NonUniformResourceIndex(meshID)][triangleIndex.z];
- 
-   // Position
-   const float3 pos0 = v0.position.xyz;
-   const float3 pos1 = v1.position.xyz;
-   const float3 pos2 = v2.position.xyz;
-   const float3 position = pos0 * barycentrics.x + pos1 * barycentrics.y + pos2 * barycentrics.z;
-   hit.pos = float3(mul(ObjectToWorld3x4(), float4(position, 1.0)));
- 
-   // Normal
-   const float3 nrm0 = v0.normal.xyz;
-   const float3 nrm1 = v1.normal.xyz;
-   const float3 nrm2 = v2.normal.xyz;
-   const float3 normal = normalize(nrm0 * barycentrics.x + nrm1 * barycentrics.y + nrm2 * barycentrics.z);
-   float3 worldNormal = normalize(mul(normal, WorldToObject3x4()).xyz);
-   const float3 geoNormal = normalize(cross(pos1 - pos0, pos2 - pos0));
-   float3 worldGeoNormal = normalize(mul(geoNormal, WorldToObject3x4()).xyz);
-   hit.geonrm = worldGeoNormal;
-   hit.nrm = worldNormal;
- 
-   return hit;
- }
-  
- //-----------------------------------------------------------------------
- // RAY GENERATION
+ // RAY GEN
  //-----------------------------------------------------------------------
  [shader("raygeneration")]
  void rgenMain()
@@ -124,28 +90,11 @@
    uint instanceID = InstanceIndex();
    uint meshID = InstanceID();
    uint primitiveID = PrimitiveIndex();
- 
-   // Rays
-   float3 D = normalize(WorldRayDirection()); // Incoming direction
-   float3 V = -D; // Vector to origin of ray: view direction
-   float3 L = normalize(skyInfo.directionToLight); // Vector to the light
- 
+  
    // Material info
-   InstanceInfo iInfo = instanceInfo[instanceID];
    float3 albedo = albedos[instanceID].xyz;
  
-   // Hit information: position, normal, geo normal
-   HitState hitState = getHitState(meshID, primitiveID, barycentrics);
- 
-   // Color at hit point
-   PbrMaterial mat = defaultPbrMaterial(albedo, pushConst.metallic, pushConst.roughness, hitState.nrm, hitState.geonrm);
-
-   // Add contribution
-   payload.color = albedo;
- 
-   // Recursive bounce
-   payload.depth += 1;
-   payload.weight *= pushConst.metallic; // more or less reflective
+   payload.color = albedo;  
  }
 
  //-----------------------------------------------------------------------
@@ -162,9 +111,11 @@
  [shader("miss")]
  void rmissMain(inout HitPayload payload)
  {
-   float3 sky_color = evalSimpleSky(skyInfo, WorldRayDirection());
-   payload.color += sky_color * payload.weight;
-   payload.depth = MISS_DEPTH; // Stop
+   // float3 sky_color = evalSimpleSky(skyInfo, WorldRayDirection());
+   // payload.color += sky_color * payload.weight;
+
+   // payload.color = float3(0.0, 0.0, 0.0);
+   // payload.depth = MISS_DEPTH; // Stop
  }
  
  
