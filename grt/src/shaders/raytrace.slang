@@ -27,9 +27,8 @@
  struct HitPayload
  {
    float3 color;
-   float weight;
-   int depth;
-   int count;
+   float depth;
+   float transmittance;
  };
  
  
@@ -65,17 +64,18 @@
    // Initial state
    HitPayload payload;
    payload.color = float3(0, 0, 0);
-   payload.weight = 1;
    payload.depth = 0;
-   payload.count = 0;
- 
-   TraceRay(topLevelAS, rayFlags, 0xff, 0, 0, 0, ray, payload);
-   float3 color = payload.color;
- 
+   payload.transmittance = 1.0;
+
+   while (payload.transmittance > 0.1f && payload.depth < INFINITE) {
+       TraceRay(topLevelAS, rayFlags, 0xff, 0, 0, 0, ray, payload);
+       ray.Origin += ray.Direction * (payload.depth + 10e-9);
+   }
+  
    // -Wpayload-access-perf
-   float weight = payload.weight;
-   int depth = payload.depth;
- 
+   float depth = payload.depth;
+
+   float3 color = payload.color;
    outImage[int2(launchID)] = float4(color, 1.0);
  }
  
@@ -93,8 +93,11 @@
   
    // Material info
    float3 albedo = albedos[instanceID].xyz;
- 
-   payload.color = albedo;  
+   float density = densities[instanceID];
+
+   payload.color += payload.transmittance * albedo * density;
+   payload.transmittance *= (1.0f - density);
+   payload.depth = RayTCurrent();
  }
 
  //-----------------------------------------------------------------------
@@ -116,6 +119,8 @@
 
    // payload.color = float3(0.0, 0.0, 0.0);
    // payload.depth = MISS_DEPTH; // Stop
+
+   payload.depth = INFINITE;
  }
  
  
