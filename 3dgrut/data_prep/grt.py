@@ -24,6 +24,12 @@ features_albedo_np   = features_albedo.detach().cpu().numpy().astype(np.float32)
 features_specular_np = features_specular.detach().cpu().numpy().astype(np.float32)
 density_np        = density.detach().cpu().numpy().astype(np.float32)
 
+# Print keys and types
+print("Model keys and types:")
+for key, value in data.items():
+    print(f"  {key}: {(value)}")
+print()
+
 # Print shape info
 print("Shape info:")
 print("N (number of points):", position_np.shape[0])
@@ -35,17 +41,21 @@ print("features_specular_dim:", features_specular_np.shape[1])
 print("density_dim:", density_np.shape[1])
 print()
 
-def print_first_last(name, arr):
-    print(f"{name} first element:", arr[0])
-    print(f"{name} last element:", arr[-1])
+def print_stats(name, arr):
+    print(f"{name} first element: {arr[0]}")
+    print(f"{name} last element:  {arr[-1]}")
+    mins = arr.min(axis=0)
+    maxs = arr.max(axis=0)
+    for i in range(arr.shape[1]):
+        print(f"{name} dim {i}: min = {mins[i]:.6f}, max = {maxs[i]:.6f}")
     print()
 
-print_first_last("position", position_np)
-print_first_last("scale", scale_np)
-print_first_last("rotate", rotate_np)
-print_first_last("features_albedo", features_albedo_np)
-print_first_last("features_specular", features_specular_np)
-print_first_last("density", density_np)
+print_stats("position", position_np)
+print_stats("scale", scale_np)
+print_stats("rotate", rotate_np)
+print_stats("features_albedo", features_albedo_np)
+print_stats("features_specular", features_specular_np)
+print_stats("density", density_np)
 
 # Write to data.bin
 with open("data.bin", "wb") as f:
