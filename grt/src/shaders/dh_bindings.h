@@ -26,8 +26,9 @@
 #define B_sceneDesc 3
 #define B_skyParam 4
 #define B_albedos 5
-#define B_densities 6
-#define B_instances 7
+#define B_shCoeffs 6
+#define B_densities 7
+#define B_instances 8
 #define B_vertex 9
 #define B_index 10
 

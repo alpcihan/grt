@@ -256,6 +256,9 @@ private:
     m_bAlbedos = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bAlbedos.buffer);
 
+    m_bSHCoeffs = m_alloc->createBuffer(cmd, m_model.speculars, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_dutil->DBG_NAME(m_bSHCoeffs.buffer);
+
     m_bDensities = m_alloc->createBuffer(cmd, m_model.densities, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bDensities.buffer);
 
@@ -382,7 +385,7 @@ private:
 
     for(int i=0; i<N;i++)
     {
-      glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(m_model.positions[i].x, m_model.positions[i].z, -m_model.positions[i].y));
+      glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(m_model.positions[i].x, m_model.positions[i].y, m_model.positions[i].z));
       glm::mat4 R = glm::toMat4(glm::quat(m_model.rotations[i]));                   // rotation matrix from quaternion
       glm::mat4 S = glm::scale(glm::mat4(1.0f), m_model.scales[i] * 0.01f);           // scale
       glm::mat4 transform = T * R * S;  // Model matrix
@@ -447,6 +450,7 @@ private:
     m_rtSet->addBinding(B_sceneDesc, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_skyParam, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_albedos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_shCoeffs, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_densities, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_instances, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_vertex, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
@@ -576,6 +580,7 @@ private:
     const VkDescriptorBufferInfo dbi_unif{m_bFrameInfo.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo dbi_sky{m_bSkyParams.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo albedos_desc{m_bAlbedos.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo shCoeffs_desc{m_bSHCoeffs.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo densities_desc{m_bDensities.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo inst_desc{m_bInstInfoBuffer.buffer, 0, VK_WHOLE_SIZE};
 
@@ -595,6 +600,7 @@ private:
     writes.emplace_back(m_rtSet->makeWrite(0, B_frameInfo, &dbi_unif));
     writes.emplace_back(m_rtSet->makeWrite(0, B_skyParam, &dbi_sky));
     writes.emplace_back(m_rtSet->makeWrite(0, B_albedos, &albedos_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_shCoeffs, &shCoeffs_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_densities, &densities_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_instances, &inst_desc));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_vertex, vertex_desc.data()));
@@ -613,6 +619,7 @@ private:
     m_alloc->destroy(m_bFrameInfo);
     m_alloc->destroy(m_bInstInfoBuffer);
     m_alloc->destroy(m_bAlbedos);
+    m_alloc->destroy(m_bSHCoeffs);
     m_alloc->destroy(m_bDensities);
     m_alloc->destroy(m_bSkyParams);
 
@@ -656,6 +663,7 @@ private:
   nvvk::Buffer                 m_bFrameInfo;
   nvvk::Buffer                 m_bInstInfoBuffer;
   nvvk::Buffer                 m_bAlbedos;
+  nvvk::Buffer                 m_bSHCoeffs;
   nvvk::Buffer                 m_bDensities;
   nvvk::Buffer                 m_bSkyParams;
 
