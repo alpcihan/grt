@@ -59,7 +59,7 @@ private:
         specular_dim = header[5];
         densities_dim = header[6];
 
-        // Read helpers
+        // read helpers
         auto readVec3 = [&](std::vector<glm::vec3> &vec)
         {
             vec.resize(N);
@@ -78,7 +78,7 @@ private:
             {
                 float buffer[4];
                 fin.read(reinterpret_cast<char *>(buffer), 4 * sizeof(float));
-                vec[i] = glm::vec4(buffer[0], buffer[1], buffer[2], buffer[3]);
+                vec[i] = glm::vec4(buffer[3], buffer[0], buffer[1], buffer[2]);
             }
         };
 
@@ -97,7 +97,7 @@ private:
             fin.read(reinterpret_cast<char *>(vec.data()), N * sizeof(float));
         };
 
-        // Read all tensors
+        // read all tensors
         readVec3(positions);
         readVec3(scales);
         readVec4(rotations);
