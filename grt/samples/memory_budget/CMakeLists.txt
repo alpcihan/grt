@@ -2,7 +2,7 @@
 get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(SHD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 
-create_sample(${PROJECT_NAME}
+create_project(${PROJECT_NAME}
   SOURCES 
     memory_budget.cpp 
   SHADER_SOURCES 
