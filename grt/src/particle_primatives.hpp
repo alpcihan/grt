@@ -9,11 +9,10 @@
 
 constexpr uint32_t ICOSAHEDRON_NUM_VERT = 12;
 constexpr uint32_t ICOSAHEDRON_NUM_TRI = 20;
-constexpr float goldenRatio   = 1.618033988749895f;
-constexpr float icosaEdge     = 1.323169076499215f;
-constexpr float icosaVrtScale = 0.5f * icosaEdge;
+constexpr float GOLDEN_RATIO   = 1.618033988749895f;
+constexpr float ICOSAHEDRON_EDGE     = 1.323169076499215f;
+constexpr float ICOSAHEDRON_VERT_SCALE = 0.5f * ICOSAHEDRON_EDGE;
 
-// NOTE: Define this constant somewhere appropriate if not already defined
 #ifndef MOGRenderAdaptiveKernelClamping
 #define MOGRenderAdaptiveKernelClamping 1
 #endif
@@ -25,10 +24,10 @@ using Int3 = glm::ivec3;
 
 inline std::array<Vec3, ICOSAHEDRON_NUM_VERT> getIcosahedronVertices() {
     return {
-        Vec3(-1, goldenRatio, 0), Vec3(1, goldenRatio, 0), Vec3(0, 1, -goldenRatio),
-        Vec3(-goldenRatio, 0, -1), Vec3(-goldenRatio, 0, 1), Vec3(0, 1, goldenRatio),
-        Vec3(goldenRatio, 0, 1), Vec3(0, -1, goldenRatio), Vec3(-1, -goldenRatio, 0),
-        Vec3(0, -1, -goldenRatio), Vec3(goldenRatio, 0, -1), Vec3(1, -goldenRatio, 0)
+        Vec3(-1, GOLDEN_RATIO, 0), Vec3(1, GOLDEN_RATIO, 0), Vec3(0, 1, -GOLDEN_RATIO),
+        Vec3(-GOLDEN_RATIO, 0, -1), Vec3(-GOLDEN_RATIO, 0, 1), Vec3(0, 1, GOLDEN_RATIO),
+        Vec3(GOLDEN_RATIO, 0, 1), Vec3(0, -1, GOLDEN_RATIO), Vec3(-1, -GOLDEN_RATIO, 0),
+        Vec3(0, -1, -GOLDEN_RATIO), Vec3(GOLDEN_RATIO, 0, -1), Vec3(1, -GOLDEN_RATIO, 0)
     };
 }
 
@@ -102,7 +101,7 @@ inline void computeGaussianEnclosingIcosahedron(
         Vec3 scl   = gScl[idx];
         Vec3 trans = gPos[idx];
 
-        Vec3 kscl = kernelScale(gDns[idx], kernelMinResponse, opts, degree) * scl * icosaVrtScale;
+        Vec3 kscl = kernelScale(gDns[idx], kernelMinResponse, opts, degree) * scl * ICOSAHEDRON_VERT_SCALE;
         for (uint32_t i = 0; i < ICOSAHEDRON_NUM_VERT; ++i) {
             gPrimVrt[sVertIdx + i] = (icosaVrt[i] * kscl) * rot + trans;
         }

@@ -34,6 +34,8 @@ public:
     std::vector<glm::vec3> albedos;
     std::vector<Vec45> speculars;
     std::vector<float> densities;
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::ivec3> triangles;
 
 private:
     void _load(const std::string &filepath, bool printInfo)
@@ -108,28 +110,32 @@ private:
         readFloat(densities);
 
         // apply activations
-        normalize(rotations);
-        exp(scales);
-        sigmoid(densities);
+        auto scalesNormalized = scales;
+        auto rotationsNormalized = rotations;
+        auto densitiesNormalized = densities;
+
+        normalize(rotationsNormalized);
+        exp(scalesNormalized);
+        sigmoid(densitiesNormalized);
         
         // load vertices and triangles
-        std::vector<glm::vec3> verts(N * ICOSAHEDRON_NUM_VERT);
-        std::vector<glm::ivec3> tris(N* ICOSAHEDRON_NUM_TRI);
-        float kernelMinResponse = 0.0113000004f;
-        uint32_t opts = 0;
-        float degree = 4;
+        vertices = std::vector<glm::vec3>(N * ICOSAHEDRON_NUM_VERT);
+        triangles = std::vector<glm::ivec3>(N* ICOSAHEDRON_NUM_TRI);
+        const float kernelMinResponse = 0.0113000004f;
+        const uint32_t opts = 0;
+        const float degree = 4;
 
         computeGaussianEnclosingIcosahedron(
             N,
             positions.data(),
-            rotations.data(),
-            scales.data(),
-            densities.data(),
+            rotationsNormalized.data(),
+            scalesNormalized.data(),
+            densitiesNormalized.data(),
             kernelMinResponse,
             opts,
             degree,
-            verts.data(),
-            tris.data()
+            vertices.data(),
+            triangles.data()
         );
 
         if (printInfo)
