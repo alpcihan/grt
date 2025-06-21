@@ -87,9 +87,10 @@
  void rchitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
    float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-   uint instanceID = InstanceIndex();
    uint meshID = InstanceID();
    uint primitiveID = PrimitiveIndex();
+
+   uint instanceID = primitiveID / 20;
 
    // Material info
    float3 radiance = radianceFromSpH(3, instanceID, WorldRayDirection(), true);

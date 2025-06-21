@@ -180,90 +180,72 @@ private:
   void createScene()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
-    // Meshes
-    m_meshes.emplace_back(nvh::createIcosahedron());
-    const int numMeshes = static_cast<int>(m_meshes.size());
-
-    // Instances
-    for(int i = 0; i < numMeshes; i++)
-    {
-      nvh::Node& n  = m_nodes.emplace_back();
-      n.mesh        = i;
-      n.material    = i;
-      n.translation = glm::vec3(-(static_cast<float>(numMeshes) / 2.F) + static_cast<float>(i), 0.F, 0.F);
-    }
-
-    // Setting camera to see the scene
+    // No mesh/instance creation needed. Camera and material defaults only.
     CameraManip.setClipPlanes({0.1F, 100.0F});
     CameraManip.setLookat({-0.5F, 0.0F, 5.0F}, {-0.5F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F});
-
-    // Default parameters for overall material
     m_pushConst.intensity = 5.0F;
     m_pushConst.maxDepth  = 1;
     m_pushConst.roughness = 0.2F;
     m_pushConst.metallic  = 0.3F;
-
-    // Default Sky values
     m_skyParams = nvvkhl_shaders::initSimpleSkyParameters();
   }
 
-
-  // Create all Vulkan buffer data
   void createVkBuffers()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
     VkCommandBuffer cmd = m_app->createTempCmdBuffer();
-    m_bMeshes.resize(m_meshes.size());
-
+    // Convert m_model.vertices (glm::vec3) to nvh::PrimitiveVertex
+    std::vector<nvh::PrimitiveVertex> vertices;
+    vertices.reserve(m_model.vertices.size());
+    for(const auto& v : m_model.vertices) {
+      nvh::PrimitiveVertex pv;
+      pv.p = v;
+      pv.n = glm::vec3(0.0f); // No normals
+      pv.t = glm::vec2(0.0f); // No texcoords
+      vertices.push_back(pv);
+    }
+    // Convert m_model.triangles (glm::ivec3) to nvh::PrimitiveTriangle
+    std::vector<nvh::PrimitiveTriangle> triangles;
+    triangles.reserve(m_model.triangles.size());
+    for(const auto& t : m_model.triangles) {
+      nvh::PrimitiveTriangle pt;
+      pt.v = glm::uvec3(t.x, t.y, t.z);
+      triangles.push_back(pt);
+    }
+    // Store as a single mesh
+    m_meshes.clear();
+    nvh::PrimitiveMesh mesh;
+    mesh.vertices = std::move(vertices);
+    mesh.triangles = std::move(triangles);
+    m_meshes.push_back(std::move(mesh));
+    m_bMeshes.resize(1);
     const VkBufferUsageFlags rt_usage_flag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
                                              | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-
-    // Create a buffer of Vertex and Index per mesh
-    for(size_t i = 0; i < m_meshes.size(); i++)
-    {
-      PrimitiveMeshVk& m = m_bMeshes[i];
-      m.vertices         = m_alloc->createBuffer(cmd, m_meshes[i].vertices, rt_usage_flag);
-      m.indices          = m_alloc->createBuffer(cmd, m_meshes[i].triangles, rt_usage_flag);
-      m_dutil->DBG_NAME_IDX(m.vertices.buffer, i);
-      m_dutil->DBG_NAME_IDX(m.indices.buffer, i);
-    }
-
-    // Create the buffer of the current frame, changing at each frame
+    m_bMeshes[0].vertices = m_alloc->createBuffer(cmd, m_meshes[0].vertices, rt_usage_flag);
+    m_bMeshes[0].indices  = m_alloc->createBuffer(cmd, m_meshes[0].triangles, rt_usage_flag);
+    m_dutil->DBG_NAME_IDX(m_bMeshes[0].vertices.buffer, 0);
+    m_dutil->DBG_NAME_IDX(m_bMeshes[0].indices.buffer, 0);
+    // Frame/sky/other buffers unchanged
     m_bFrameInfo = m_alloc->createBuffer(sizeof(DH::FrameInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     m_dutil->DBG_NAME(m_bFrameInfo.buffer);
-
-    // Create the buffer of sky parameters, updated at each frame
     m_bSkyParams = m_alloc->createBuffer(sizeof(nvvkhl_shaders::SimpleSkyParameters), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     m_dutil->DBG_NAME(m_bSkyParams.buffer);
-
-    // Primitive instance information
-    std::vector<DH::InstanceInfo> inst_info;
-    inst_info.reserve(m_nodes.size());
-    for(const nvh::Node& node : m_nodes)
-    {
-      DH::InstanceInfo info{.transform = node.localMatrix(), .materialID = node.material};
-      inst_info.push_back(info);
-    }
-    m_bInstInfoBuffer =
-        m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    // No per-instance info needed, but keep a dummy InstanceInfo for descriptor compatibility
+    std::vector<DH::InstanceInfo> inst_info(1);
+    inst_info[0].transform = glm::mat4(1.0f);
+    inst_info[0].materialID = 0;
+    m_bInstInfoBuffer = m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bInstInfoBuffer.buffer);
-
     m_bAlbedos = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bAlbedos.buffer);
-
     m_bSHCoeffs = m_alloc->createBuffer(cmd, m_model.speculars, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bSHCoeffs.buffer);
-
     m_bDensities = m_alloc->createBuffer(cmd, m_model.densities, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bDensities.buffer);
-
     m_app->submitAndWaitTempCmdBuffer(cmd);
   }
-
 
   //--------------------------------------------------------------------------------------------------
   // Converting a PrimitiveMesh as input for BLAS
@@ -308,65 +290,38 @@ private:
   void createBottomLevelAS()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
-    size_t numMeshes = m_meshes.size();
-
-    // BLAS - Storing each primitive in a geometry
+    // Only one mesh
+    m_blas.resize(1);
     std::vector<nvvk::AccelerationStructureBuildData> blasBuildData;
-    blasBuildData.reserve(numMeshes);
-    m_blas.resize(numMeshes);  // All BLAS
-
-    // Get the build information for all the BLAS
-    for(uint32_t p_idx = 0; p_idx < numMeshes; p_idx++)
-    {
-      nvvk::AccelerationStructureBuildData buildData{VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR};
-
-      const VkDeviceAddress vertexBufferAddress = m_bMeshes[p_idx].vertices.address;
-      const VkDeviceAddress indexBufferAddress  = m_bMeshes[p_idx].indices.address;
-
-      auto geo = primitiveToGeometry(m_meshes[p_idx], vertexBufferAddress, indexBufferAddress);
-      buildData.addGeometry(geo);
-
-      VkAccelerationStructureBuildSizesInfoKHR sizeInfo =
-          buildData.finalizeGeometry(m_device, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
-                                                   | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
-
-      blasBuildData.emplace_back(buildData);
-    }
-
-    // Find the most optimal size for our scratch buffer, and get the addresses of the scratch buffers
-    // to allow a maximum of BLAS to be built in parallel, within the budget
+    blasBuildData.reserve(1);
+    nvvk::AccelerationStructureBuildData buildData{VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR};
+    const VkDeviceAddress vertexBufferAddress = m_bMeshes[0].vertices.address;
+    const VkDeviceAddress indexBufferAddress  = m_bMeshes[0].indices.address;
+    auto geo = primitiveToGeometry(m_meshes[0], vertexBufferAddress, indexBufferAddress);
+    buildData.addGeometry(geo);
+    buildData.finalizeGeometry(m_device, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+                                                   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+    blasBuildData.emplace_back(buildData);
     nvvk::BlasBuilder blasBuilder(m_alloc.get(), m_device);
-    VkDeviceSize      hintScratchBudget = 2'000'000;  // Limiting the size of the scratch buffer to 2MB
-    VkDeviceSize      scratchSize       = blasBuilder.getScratchSize(hintScratchBudget, blasBuildData);
-    nvvk::Buffer      scratchBuffer =
-        m_alloc->createBuffer(scratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    VkDeviceSize hintScratchBudget = 2'000'000;
+    VkDeviceSize scratchSize = blasBuilder.getScratchSize(hintScratchBudget, blasBuildData);
+    nvvk::Buffer scratchBuffer = m_alloc->createBuffer(scratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     std::vector<VkDeviceAddress> scratchAddresses;
     blasBuilder.getScratchAddresses(hintScratchBudget, blasBuildData, scratchBuffer.address, scratchAddresses);
-
-    // Start the build and compaction of the BLAS
-    VkDeviceSize hintBuildBudget = 2'000'000;  // Limiting the size of the scratch buffer to 2MB
-    bool         finished        = false;
-    LOGI("\n");
-    do
-    {
+    bool finished = false;
+    do {
       {
-        // Create, build and query the size of the BLAS, up to the 2MBi
         VkCommandBuffer cmd = m_app->createTempCmdBuffer();
-        finished = blasBuilder.cmdCreateParallelBlas(cmd, blasBuildData, m_blas, scratchAddresses, hintBuildBudget);
+        finished = blasBuilder.cmdCreateParallelBlas(cmd, blasBuildData, m_blas, scratchAddresses, hintScratchBudget);
         m_app->submitAndWaitTempCmdBuffer(cmd);
       }
       {
-        // Compacting the BLAS, and destroy the previous ones
         VkCommandBuffer cmd = m_app->createTempCmdBuffer();
         blasBuilder.cmdCompactBlas(cmd, blasBuildData, m_blas);
         m_app->submitAndWaitTempCmdBuffer(cmd);
         blasBuilder.destroyNonCompactedBlas();
       }
     } while(!finished);
-    LOGI("%s%s\n", nvh::ScopedTimer::indent().c_str(), blasBuilder.getStatistics().toString().c_str());
-
-    // Cleanup
     m_alloc->destroy(scratchBuffer);
   }
 
@@ -376,60 +331,33 @@ private:
   void createTopLevelAS()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
-    const int N = m_model.N; 
-    const int meshIdx = 0;
-    std::vector<VkAccelerationStructureInstanceKHR> tlasInstances;
-    tlasInstances.reserve(N);
-
-    for(int i=0; i<N;i++)
-    {
-      glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(m_model.positions[i].x, m_model.positions[i].y, m_model.positions[i].z));
-      glm::mat4 R = glm::toMat4(glm::quat(m_model.rotations[i]));                   // rotation matrix from quaternion
-      glm::mat4 S = glm::scale(glm::mat4(1.0f), m_model.scales[i] * 0.01f);           // scale
-      glm::mat4 transform = T * R * S;  // Model matrix
-
-      VkAccelerationStructureInstanceKHR ray_inst{
-          .transform           = nvvk::toTransformMatrixKHR(transform),  // Position of the instance
-          .instanceCustomIndex = static_cast<uint32_t>(meshIdx),         // gl_InstanceCustomIndexEX
-          .mask                = 0xFF,                                   // All objects
-          .instanceShaderBindingTableRecordOffset = 0,                   // We will use the same hit group for all object
-          .flags                                  = 0,
-          .accelerationStructureReference         = m_blas[meshIdx].address,
-      };
-      tlasInstances.emplace_back(ray_inst);
-    }
-
+    // Only one instance, identity transform
+    std::vector<VkAccelerationStructureInstanceKHR> tlasInstances(1);
+    tlasInstances[0].transform = nvvk::toTransformMatrixKHR(glm::mat4(1.0f));
+    tlasInstances[0].instanceCustomIndex = 0;
+    tlasInstances[0].mask = 0xFF;
+    tlasInstances[0].instanceShaderBindingTableRecordOffset = 0;
+    tlasInstances[0].flags = 0;
+    tlasInstances[0].accelerationStructureReference = m_blas[0].address;
     VkCommandBuffer cmd = m_app->createTempCmdBuffer();
-
-    // Create the instances buffer, add a barrier to ensure the data is copied before the TLAS build
     nvvk::Buffer instancesBuffer = m_alloc->createBuffer(cmd, tlasInstances,
-                                                         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
-                                                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+                                                         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                                                         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     nvvk::accelerationStructureBarrier(cmd, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
-
-
-    nvvk::AccelerationStructureBuildData    tlasBuildData{VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR};
+    nvvk::AccelerationStructureBuildData tlasBuildData{VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR};
     nvvk::AccelerationStructureGeometryInfo geometryInfo =
         tlasBuildData.makeInstanceGeometry(tlasInstances.size(), instancesBuffer.address);
     tlasBuildData.addGeometry(geometryInfo);
-    // Get the size of the TLAS
     auto sizeInfo = tlasBuildData.finalizeGeometry(m_device, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
-
-    // Create the scratch buffer
-    nvvk::Buffer scratchBuffer = m_alloc->createBuffer(sizeInfo.buildScratchSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-                                                                                      | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-
-    // Create the TLAS
+    nvvk::Buffer scratchBuffer = m_alloc->createBuffer(sizeInfo.buildScratchSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                                                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     m_tlas = m_alloc->createAcceleration(tlasBuildData.makeCreateInfo());
     tlasBuildData.cmdBuildAccelerationStructure(cmd, m_tlas.accel, scratchBuffer.address);
     m_app->submitAndWaitTempCmdBuffer(cmd);
-
     m_alloc->destroy(scratchBuffer);
     m_alloc->destroy(instancesBuffer);
     m_alloc->finalizeAndReleaseStaging();
   }
-
 
   //--------------------------------------------------------------------------------------------------
   // Pipeline for the ray tracer: all shaders, raygen, chit, anyhit, miss
@@ -669,7 +597,6 @@ private:
 
   // Data and setting
   std::vector<nvh::PrimitiveMesh> m_meshes;
-  std::vector<nvh::Node>          m_nodes;
 
   // Pipeline
   DH::PushConstant m_pushConst{};  // Information sent to the shader
