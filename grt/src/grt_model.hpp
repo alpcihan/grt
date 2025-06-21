@@ -4,6 +4,8 @@
 #include <iostream>
 #include <fstream>
 #include <glm/glm.hpp>
+#include "particle_primatives.hpp"
+#include "math_utils.hpp"
 
 // Struct for 45-element vector
 struct Vec45
@@ -78,7 +80,7 @@ private:
             {
                 float buffer[4];
                 fin.read(reinterpret_cast<char *>(buffer), 4 * sizeof(float));
-                vec[i] = glm::vec4(buffer[3], buffer[0], buffer[1], buffer[2]);
+                vec[i] = glm::vec4(buffer[0], buffer[1], buffer[2], buffer[3]);
             }
         };
 
@@ -99,11 +101,36 @@ private:
 
         // read all tensors
         readVec3(positions);
-        readVec3(scales);
-        readVec4(rotations);
-        readVec3(albedos);
+        readVec3(scales);    
+        readVec4(rotations); 
+        readVec3(albedos);    
         readVec45(speculars);
         readFloat(densities);
+
+        // apply activations
+        normalize(rotations);
+        exp(scales);
+        sigmoid(densities);
+        
+        // load vertices and triangles
+        std::vector<glm::vec3> verts(N * ICOSAHEDRON_NUM_VERT);
+        std::vector<glm::ivec3> tris(N* ICOSAHEDRON_NUM_TRI);
+        float kernelMinResponse = 0.0113000004f;
+        uint32_t opts = 0;
+        float degree = 4;
+
+        computeGaussianEnclosingIcosahedron(
+            N,
+            positions.data(),
+            rotations.data(),
+            scales.data(),
+            densities.data(),
+            kernelMinResponse,
+            opts,
+            degree,
+            verts.data(),
+            tris.data()
+        );
 
         if (printInfo)
         {

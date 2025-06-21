@@ -33,6 +33,8 @@ def run_demo(gs_object, mesh_assets_folder, envmap_assets_folder, default_gs_con
 
 
 if __name__ == "__main__":
+    print("playground.py process id:", os.getpid())
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--gs_object',

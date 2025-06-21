@@ -1,3 +1,4 @@
+#include <memory>
 #include "grt.hpp"
 
 int main(int argc, char** argv)
@@ -39,7 +40,7 @@ int main(int argc, char** argv)
   VkPhysicalDeviceRayTracingValidationFeaturesNV validationFeatures = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV};
   vkSetup.deviceExtensions.push_back({VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME, &validationFeatures, false});
 #endif
-
+  
   // Create Vulkan context
   auto vkContext = std::make_unique<VulkanContext>(vkSetup);
   if(!vkContext->isValid())
