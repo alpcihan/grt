@@ -56,7 +56,7 @@ def setup_playground(conf):
         pass
 
     # Compiler options.
-    cc_flags = ["-DNVDR_TORCH"]
+    cc_flags = ["-DNVDR_TORCH", "-fPIC", "-g"]
 
     nvcc_flags = [
         "-DNVDR_TORCH",

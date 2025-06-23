@@ -197,11 +197,17 @@ class Tracer:
                 or self.conf.render.particle_kernel_density_clamping
                 or self.num_update_bvh >= self.conf.render.max_consecutive_bvh_update
             )
+            
+            pos = gaussians.positions.view(-1, 3).contiguous()
+            rot = gaussians.rotation_activation(gaussians.rotation).view(-1, 4).contiguous()
+            sca = gaussians.scale_activation(gaussians.scale).view(-1, 3).contiguous()
+            den = gaussians.density_activation(gaussians.density).view(-1, 1).contiguous()
+
             self.tracer_wrapper.build_bvh(
-                gaussians.positions.view(-1, 3).contiguous(),
-                gaussians.rotation_activation(gaussians.rotation).view(-1, 4).contiguous(),
-                gaussians.scale_activation(gaussians.scale).view(-1, 3).contiguous(),
-                gaussians.density_activation(gaussians.density).view(-1, 1).contiguous(),
+                pos,
+                rot,
+                sca,
+                den,
                 rebuild_bvh,
                 allow_bvh_update,
             )

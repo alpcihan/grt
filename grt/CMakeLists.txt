@@ -99,7 +99,7 @@ function(makeRelative FROM TO OUT)
     set (${OUT} "${_TMP_STR}" PARENT_SCOPE)
 endfunction()
 
-function(create_sample  PROJECT_NAME)
+function(create_project  PROJECT_NAME)
     set(options)
     set(oneValueArgs)
     set(multiValueArgs SOURCES SHADER_SOURCES SHADER_HEADERS SHADER_HLSL SHADER_SLANG FLAGS)
@@ -109,7 +109,7 @@ function(create_sample  PROJECT_NAME)
     #get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
     message(STATUS "-------------------------------")
     message(STATUS "Processing Project ${PROJECT_NAME}")
-    set(EXECUTABLE_NAME "vk_mini_${PROJECT_NAME}")
+    set(EXECUTABLE_NAME "vk_${PROJECT_NAME}")
     add_executable(${EXECUTABLE_NAME})
     
     # Force good level of warnings

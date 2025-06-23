@@ -14,14 +14,14 @@
  [[vk::binding(B_outImage)]] RWTexture2D<float4> outImage;
  [[vk::binding(B_frameInfo)]] ConstantBuffer<FrameInfo> frameInfo;
  [[vk::binding(B_skyParam)]] ConstantBuffer<SimpleSkyParameters> skyInfo;
+ //[[vk::binding(B_vertex)]] StructuredBuffer<Vertex> vertices[];
+ //[[vk::binding(B_index)]] StructuredBuffer<uint3> indices[];
+
  [[vk::binding(B_albedos)]] StructuredBuffer<float3> albedos;
  [[vk::binding(B_shCoeffs)]] StructuredBuffer<float3> shCoeffs;
  [[vk::binding(B_densities)]] StructuredBuffer<float> densities;
  [[vk::binding(B_instances)]] StructuredBuffer<InstanceInfo> instanceInfo;
- [[vk::binding(B_vertex)]] StructuredBuffer<Vertex> vertices[];
- [[vk::binding(B_index)]] StructuredBuffer<uint3> indices[];
- 
- 
+
  //-----------------------------------------------------------------------
  // Payload 
  // See: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#example
@@ -40,7 +40,6 @@
     int particleId;
     float distance;
  };
- 
  
  //-----------------------------------------------------------------------
  // RAY GEN
@@ -88,9 +87,10 @@
  void rchitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
    float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-   uint instanceID = InstanceIndex();
    uint meshID = InstanceID();
    uint primitiveID = PrimitiveIndex();
+
+   uint instanceID = primitiveID / 20;
 
    // Material info
    float3 radiance = radianceFromSpH(3, instanceID, WorldRayDirection(), true);

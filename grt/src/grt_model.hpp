@@ -4,6 +4,8 @@
 #include <iostream>
 #include <fstream>
 #include <glm/glm.hpp>
+#include "particle_primatives.hpp"
+#include "math_utils.hpp"
 
 // Struct for 45-element vector
 struct Vec45
@@ -32,6 +34,8 @@ public:
     std::vector<glm::vec3> albedos;
     std::vector<Vec45> speculars;
     std::vector<float> densities;
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::ivec3> triangles;
 
 private:
     void _load(const std::string &filepath, bool printInfo)
@@ -78,7 +82,7 @@ private:
             {
                 float buffer[4];
                 fin.read(reinterpret_cast<char *>(buffer), 4 * sizeof(float));
-                vec[i] = glm::vec4(buffer[3], buffer[0], buffer[1], buffer[2]);
+                vec[i] = glm::vec4(buffer[0], buffer[1], buffer[2], buffer[3]);
             }
         };
 
@@ -99,11 +103,40 @@ private:
 
         // read all tensors
         readVec3(positions);
-        readVec3(scales);
-        readVec4(rotations);
-        readVec3(albedos);
+        readVec3(scales);    
+        readVec4(rotations); 
+        readVec3(albedos);    
         readVec45(speculars);
         readFloat(densities);
+
+        // apply activations
+        auto scalesNormalized = scales;
+        auto rotationsNormalized = rotations;
+        auto densitiesNormalized = densities;
+
+        normalize(rotationsNormalized);
+        exp(scalesNormalized);
+        sigmoid(densitiesNormalized);
+        
+        // load vertices and triangles
+        vertices = std::vector<glm::vec3>(N * ICOSAHEDRON_NUM_VERT);
+        triangles = std::vector<glm::ivec3>(N* ICOSAHEDRON_NUM_TRI);
+        const float kernelMinResponse = 0.0113000004f;
+        const uint32_t opts = 0;
+        const float degree = 4;
+
+        computeGaussianEnclosingIcosahedron(
+            N,
+            positions.data(),
+            rotationsNormalized.data(),
+            scalesNormalized.data(),
+            densitiesNormalized.data(),
+            kernelMinResponse,
+            opts,
+            degree,
+            vertices.data(),
+            triangles.data()
+        );
 
         if (printInfo)
         {

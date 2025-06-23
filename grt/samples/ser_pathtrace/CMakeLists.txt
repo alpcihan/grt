@@ -16,7 +16,7 @@ file(GLOB_RECURSE SHADER_SLANG ${SHD_DIR}/*.slang)
 file(GLOB_RECURSE SHADER_HEADERS ${SHD_DIR}/*.h)
 
 # Create the sample
-create_sample(${PROJECT_NAME} 
+create_project(${PROJECT_NAME} 
   SOURCES           ${SOURCES}
   SHADER_SOURCES    ${SHADER_SOURCES}
   SHADER_HEADERS    ${SHADER_HEADERS}

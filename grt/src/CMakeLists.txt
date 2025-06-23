@@ -13,7 +13,7 @@ file(GLOB_RECURSE SHADER_SLANG ${SHD_DIR}/*.slang)
 file(GLOB_RECURSE SHADER_HEADERS ${SHD_DIR}/*.h)
 
 
-create_sample(grt
+create_project(grt
   SOURCES           ${SOURCES}
   SHADER_SOURCES    ${SHADER_SOURCES}
   SHADER_HEADERS    ${SHADER_HEADERS}

@@ -1,3 +1,5 @@
+#pragma once
+
 #define IMGUI_DEFINE_MATH_OPERATORS  // ImGUI ImVec maths
 
 #include "common/vk_context.hpp"                    // Vulkan context creation
@@ -18,7 +20,7 @@
 #include "nvvkhl/sky.hpp"                           // Sun & Sky
 #include "nvvk/renderpasses_vk.hpp"
 
-#include "grt_model.h"
+#include "grt_model.hpp"
 
 #include <glm/gtx/quaternion.hpp>
 
@@ -47,16 +49,13 @@ const auto& rchit_shd = std::vector<uint32_t>{std::begin(raytrace_rchit_glsl), s
 const auto& rmiss_shd = std::vector<uint32_t>{std::begin(raytrace_rmiss_glsl), std::end(raytrace_rmiss_glsl)};
 #endif
 
-// The maximum depth recursion for the ray tracer
 uint32_t MAXRAYRECURSIONDEPTH = 10;
 
-//////////////////////////////////////////////////////////////////////////
-/// </summary> Ray trace multiple primitives
-class Raytracing : public nvvkhl::IAppElement
+class GRT : public nvvkhl::IAppElement
 {
 public:
-  Raytracing(): m_model("/home/alp/Desktop/grt/grt/src/_data/data.bin", true){}
-  ~Raytracing() override = default;
+  GRT(): m_model("/home/alp/Desktop/grt/grt/src/_data/data.bin", true){}
+  ~GRT() override = default;
 
   void onAttach(nvvkhl::Application* app) override
   {
@@ -181,90 +180,72 @@ private:
   void createScene()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
-    // Meshes
-    m_meshes.emplace_back(nvh::createIcosahedron());
-    const int numMeshes = static_cast<int>(m_meshes.size());
-
-    // Instances
-    for(int i = 0; i < numMeshes; i++)
-    {
-      nvh::Node& n  = m_nodes.emplace_back();
-      n.mesh        = i;
-      n.material    = i;
-      n.translation = glm::vec3(-(static_cast<float>(numMeshes) / 2.F) + static_cast<float>(i), 0.F, 0.F);
-    }
-
-    // Setting camera to see the scene
+    // No mesh/instance creation needed. Camera and material defaults only.
     CameraManip.setClipPlanes({0.1F, 100.0F});
     CameraManip.setLookat({-0.5F, 0.0F, 5.0F}, {-0.5F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F});
-
-    // Default parameters for overall material
     m_pushConst.intensity = 5.0F;
     m_pushConst.maxDepth  = 1;
     m_pushConst.roughness = 0.2F;
     m_pushConst.metallic  = 0.3F;
-
-    // Default Sky values
     m_skyParams = nvvkhl_shaders::initSimpleSkyParameters();
   }
 
-
-  // Create all Vulkan buffer data
   void createVkBuffers()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
     VkCommandBuffer cmd = m_app->createTempCmdBuffer();
-    m_bMeshes.resize(m_meshes.size());
-
+    // Convert m_model.vertices (glm::vec3) to nvh::PrimitiveVertex
+    std::vector<nvh::PrimitiveVertex> vertices;
+    vertices.reserve(m_model.vertices.size());
+    for(const auto& v : m_model.vertices) {
+      nvh::PrimitiveVertex pv;
+      pv.p = v;
+      pv.n = glm::vec3(0.0f); // No normals
+      pv.t = glm::vec2(0.0f); // No texcoords
+      vertices.push_back(pv);
+    }
+    // Convert m_model.triangles (glm::ivec3) to nvh::PrimitiveTriangle
+    std::vector<nvh::PrimitiveTriangle> triangles;
+    triangles.reserve(m_model.triangles.size());
+    for(const auto& t : m_model.triangles) {
+      nvh::PrimitiveTriangle pt;
+      pt.v = glm::uvec3(t.x, t.y, t.z);
+      triangles.push_back(pt);
+    }
+    // Store as a single mesh
+    m_meshes.clear();
+    nvh::PrimitiveMesh mesh;
+    mesh.vertices = std::move(vertices);
+    mesh.triangles = std::move(triangles);
+    m_meshes.push_back(std::move(mesh));
+    m_bMeshes.resize(1);
     const VkBufferUsageFlags rt_usage_flag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
                                              | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-
-    // Create a buffer of Vertex and Index per mesh
-    for(size_t i = 0; i < m_meshes.size(); i++)
-    {
-      PrimitiveMeshVk& m = m_bMeshes[i];
-      m.vertices         = m_alloc->createBuffer(cmd, m_meshes[i].vertices, rt_usage_flag);
-      m.indices          = m_alloc->createBuffer(cmd, m_meshes[i].triangles, rt_usage_flag);
-      m_dutil->DBG_NAME_IDX(m.vertices.buffer, i);
-      m_dutil->DBG_NAME_IDX(m.indices.buffer, i);
-    }
-
-    // Create the buffer of the current frame, changing at each frame
+    m_bMeshes[0].vertices = m_alloc->createBuffer(cmd, m_meshes[0].vertices, rt_usage_flag);
+    m_bMeshes[0].indices  = m_alloc->createBuffer(cmd, m_meshes[0].triangles, rt_usage_flag);
+    m_dutil->DBG_NAME_IDX(m_bMeshes[0].vertices.buffer, 0);
+    m_dutil->DBG_NAME_IDX(m_bMeshes[0].indices.buffer, 0);
+    // Frame/sky/other buffers unchanged
     m_bFrameInfo = m_alloc->createBuffer(sizeof(DH::FrameInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     m_dutil->DBG_NAME(m_bFrameInfo.buffer);
-
-    // Create the buffer of sky parameters, updated at each frame
     m_bSkyParams = m_alloc->createBuffer(sizeof(nvvkhl_shaders::SimpleSkyParameters), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     m_dutil->DBG_NAME(m_bSkyParams.buffer);
-
-    // Primitive instance information
-    std::vector<DH::InstanceInfo> inst_info;
-    inst_info.reserve(m_nodes.size());
-    for(const nvh::Node& node : m_nodes)
-    {
-      DH::InstanceInfo info{.transform = node.localMatrix(), .materialID = node.material};
-      inst_info.push_back(info);
-    }
-    m_bInstInfoBuffer =
-        m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    // No per-instance info needed, but keep a dummy InstanceInfo for descriptor compatibility
+    std::vector<DH::InstanceInfo> inst_info(1);
+    inst_info[0].transform = glm::mat4(1.0f);
+    inst_info[0].materialID = 0;
+    m_bInstInfoBuffer = m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bInstInfoBuffer.buffer);
-
     m_bAlbedos = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bAlbedos.buffer);
-
     m_bSHCoeffs = m_alloc->createBuffer(cmd, m_model.speculars, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bSHCoeffs.buffer);
-
     m_bDensities = m_alloc->createBuffer(cmd, m_model.densities, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bDensities.buffer);
-
     m_app->submitAndWaitTempCmdBuffer(cmd);
   }
-
 
   //--------------------------------------------------------------------------------------------------
   // Converting a PrimitiveMesh as input for BLAS
@@ -309,65 +290,38 @@ private:
   void createBottomLevelAS()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
-    size_t numMeshes = m_meshes.size();
-
-    // BLAS - Storing each primitive in a geometry
+    // Only one mesh
+    m_blas.resize(1);
     std::vector<nvvk::AccelerationStructureBuildData> blasBuildData;
-    blasBuildData.reserve(numMeshes);
-    m_blas.resize(numMeshes);  // All BLAS
-
-    // Get the build information for all the BLAS
-    for(uint32_t p_idx = 0; p_idx < numMeshes; p_idx++)
-    {
-      nvvk::AccelerationStructureBuildData buildData{VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR};
-
-      const VkDeviceAddress vertexBufferAddress = m_bMeshes[p_idx].vertices.address;
-      const VkDeviceAddress indexBufferAddress  = m_bMeshes[p_idx].indices.address;
-
-      auto geo = primitiveToGeometry(m_meshes[p_idx], vertexBufferAddress, indexBufferAddress);
-      buildData.addGeometry(geo);
-
-      VkAccelerationStructureBuildSizesInfoKHR sizeInfo =
-          buildData.finalizeGeometry(m_device, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
-                                                   | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
-
-      blasBuildData.emplace_back(buildData);
-    }
-
-    // Find the most optimal size for our scratch buffer, and get the addresses of the scratch buffers
-    // to allow a maximum of BLAS to be built in parallel, within the budget
+    blasBuildData.reserve(1);
+    nvvk::AccelerationStructureBuildData buildData{VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR};
+    const VkDeviceAddress vertexBufferAddress = m_bMeshes[0].vertices.address;
+    const VkDeviceAddress indexBufferAddress  = m_bMeshes[0].indices.address;
+    auto geo = primitiveToGeometry(m_meshes[0], vertexBufferAddress, indexBufferAddress);
+    buildData.addGeometry(geo);
+    buildData.finalizeGeometry(m_device, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+                                                   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+    blasBuildData.emplace_back(buildData);
     nvvk::BlasBuilder blasBuilder(m_alloc.get(), m_device);
-    VkDeviceSize      hintScratchBudget = 2'000'000;  // Limiting the size of the scratch buffer to 2MB
-    VkDeviceSize      scratchSize       = blasBuilder.getScratchSize(hintScratchBudget, blasBuildData);
-    nvvk::Buffer      scratchBuffer =
-        m_alloc->createBuffer(scratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    VkDeviceSize hintScratchBudget = 2'000'000;
+    VkDeviceSize scratchSize = blasBuilder.getScratchSize(hintScratchBudget, blasBuildData);
+    nvvk::Buffer scratchBuffer = m_alloc->createBuffer(scratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     std::vector<VkDeviceAddress> scratchAddresses;
     blasBuilder.getScratchAddresses(hintScratchBudget, blasBuildData, scratchBuffer.address, scratchAddresses);
-
-    // Start the build and compaction of the BLAS
-    VkDeviceSize hintBuildBudget = 2'000'000;  // Limiting the size of the scratch buffer to 2MB
-    bool         finished        = false;
-    LOGI("\n");
-    do
-    {
+    bool finished = false;
+    do {
       {
-        // Create, build and query the size of the BLAS, up to the 2MBi
         VkCommandBuffer cmd = m_app->createTempCmdBuffer();
-        finished = blasBuilder.cmdCreateParallelBlas(cmd, blasBuildData, m_blas, scratchAddresses, hintBuildBudget);
+        finished = blasBuilder.cmdCreateParallelBlas(cmd, blasBuildData, m_blas, scratchAddresses, hintScratchBudget);
         m_app->submitAndWaitTempCmdBuffer(cmd);
       }
       {
-        // Compacting the BLAS, and destroy the previous ones
         VkCommandBuffer cmd = m_app->createTempCmdBuffer();
         blasBuilder.cmdCompactBlas(cmd, blasBuildData, m_blas);
         m_app->submitAndWaitTempCmdBuffer(cmd);
         blasBuilder.destroyNonCompactedBlas();
       }
     } while(!finished);
-    LOGI("%s%s\n", nvh::ScopedTimer::indent().c_str(), blasBuilder.getStatistics().toString().c_str());
-
-    // Cleanup
     m_alloc->destroy(scratchBuffer);
   }
 
@@ -377,60 +331,33 @@ private:
   void createTopLevelAS()
   {
     nvh::ScopedTimer st(__FUNCTION__);
-
-    const int N = m_model.N; 
-    const int meshIdx = 0;
-    std::vector<VkAccelerationStructureInstanceKHR> tlasInstances;
-    tlasInstances.reserve(N);
-
-    for(int i=0; i<N;i++)
-    {
-      glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(m_model.positions[i].x, m_model.positions[i].y, m_model.positions[i].z));
-      glm::mat4 R = glm::toMat4(glm::quat(m_model.rotations[i]));                   // rotation matrix from quaternion
-      glm::mat4 S = glm::scale(glm::mat4(1.0f), m_model.scales[i] * 0.01f);           // scale
-      glm::mat4 transform = T * R * S;  // Model matrix
-
-      VkAccelerationStructureInstanceKHR ray_inst{
-          .transform           = nvvk::toTransformMatrixKHR(transform),  // Position of the instance
-          .instanceCustomIndex = static_cast<uint32_t>(meshIdx),         // gl_InstanceCustomIndexEX
-          .mask                = 0xFF,                                   // All objects
-          .instanceShaderBindingTableRecordOffset = 0,                   // We will use the same hit group for all object
-          .flags                                  = 0,
-          .accelerationStructureReference         = m_blas[meshIdx].address,
-      };
-      tlasInstances.emplace_back(ray_inst);
-    }
-
+    // Only one instance, identity transform
+    std::vector<VkAccelerationStructureInstanceKHR> tlasInstances(1);
+    tlasInstances[0].transform = nvvk::toTransformMatrixKHR(glm::mat4(1.0f));
+    tlasInstances[0].instanceCustomIndex = 0;
+    tlasInstances[0].mask = 0xFF;
+    tlasInstances[0].instanceShaderBindingTableRecordOffset = 0;
+    tlasInstances[0].flags = 0;
+    tlasInstances[0].accelerationStructureReference = m_blas[0].address;
     VkCommandBuffer cmd = m_app->createTempCmdBuffer();
-
-    // Create the instances buffer, add a barrier to ensure the data is copied before the TLAS build
     nvvk::Buffer instancesBuffer = m_alloc->createBuffer(cmd, tlasInstances,
-                                                         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
-                                                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+                                                         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                                                         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     nvvk::accelerationStructureBarrier(cmd, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
-
-
-    nvvk::AccelerationStructureBuildData    tlasBuildData{VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR};
+    nvvk::AccelerationStructureBuildData tlasBuildData{VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR};
     nvvk::AccelerationStructureGeometryInfo geometryInfo =
         tlasBuildData.makeInstanceGeometry(tlasInstances.size(), instancesBuffer.address);
     tlasBuildData.addGeometry(geometryInfo);
-    // Get the size of the TLAS
     auto sizeInfo = tlasBuildData.finalizeGeometry(m_device, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
-
-    // Create the scratch buffer
-    nvvk::Buffer scratchBuffer = m_alloc->createBuffer(sizeInfo.buildScratchSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-                                                                                      | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-
-    // Create the TLAS
+    nvvk::Buffer scratchBuffer = m_alloc->createBuffer(sizeInfo.buildScratchSize, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                                                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     m_tlas = m_alloc->createAcceleration(tlasBuildData.makeCreateInfo());
     tlasBuildData.cmdBuildAccelerationStructure(cmd, m_tlas.accel, scratchBuffer.address);
     m_app->submitAndWaitTempCmdBuffer(cmd);
-
     m_alloc->destroy(scratchBuffer);
     m_alloc->destroy(instancesBuffer);
     m_alloc->finalizeAndReleaseStaging();
   }
-
 
   //--------------------------------------------------------------------------------------------------
   // Pipeline for the ray tracer: all shaders, raygen, chit, anyhit, miss
@@ -640,9 +567,7 @@ private:
                            nvh::getExecutablePath().replace_extension(".jpg").string(), 95);
   }
 
-  //--------------------------------------------------------------------------------------------------
-  //
-  //
+private:
   nvvkhl::Application*                          m_app = nullptr;
   std::unique_ptr<nvvk::DebugUtil>              m_dutil;
   std::unique_ptr<nvvk::ResourceAllocatorDma>   m_alloc;
@@ -672,7 +597,6 @@ private:
 
   // Data and setting
   std::vector<nvh::PrimitiveMesh> m_meshes;
-  std::vector<nvh::Node>          m_nodes;
 
   // Pipeline
   DH::PushConstant m_pushConst{};  // Information sent to the shader
@@ -684,92 +608,3 @@ private:
   // Model
   GRTModel m_model;
 };
-
-
-//////////////////////////////////////////////////////////////////////////
-///
-//////////////////////////////////////////////////////////////////////////
-int main(int argc, char** argv)
-{
-  nvvkhl::ApplicationCreateInfo appInfo;
-
-  nvh::CommandLineParser cli(PROJECT_NAME);
-  cli.addArgument({"--headless"}, &appInfo.headless, "Run in headless mode");
-  cli.addArgument({"--frames"}, &appInfo.headlessFrameCount, "Number of frames to render in headless mode");
-  cli.parse(argc, argv);
-
-
-  VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_feature{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_feature{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR};
-
-  // Configure Vulkan context creation
-  VkContextSettings vkSetup;
-  if(!appInfo.headless)
-  {
-    nvvkhl::addSurfaceExtensions(vkSetup.instanceExtensions);
-    vkSetup.deviceExtensions.push_back({VK_KHR_SWAPCHAIN_EXTENSION_NAME});
-  }
-  vkSetup.instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-  vkSetup.deviceExtensions.push_back({VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME});
-  vkSetup.deviceExtensions.push_back({VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, &accel_feature});  // To build acceleration structures
-  vkSetup.deviceExtensions.push_back({VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, &rt_pipeline_feature});  // To use vkCmdTraceRaysKHR
-  vkSetup.deviceExtensions.push_back({VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME});  // Required by ray tracing pipeline
-  vkSetup.deviceExtensions.push_back({VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME});  // Require for Undockable Viewport
-
-#if USE_HLSL || USE_SLANG  // DXC is automatically adding the extension
-  VkPhysicalDeviceRayQueryFeaturesKHR rayqueryFeature{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
-  vkSetup.deviceExtensions.push_back({VK_KHR_RAY_QUERY_EXTENSION_NAME, &rayqueryFeature});
-#endif  // USE_HLSL
-
-#if(VK_HEADER_VERSION >= 283)
-  // To enable ray tracing validation, set the NV_ALLOW_RAYTRACING_VALIDATION=1 environment variable
-  // https://developer.nvidia.com/blog/ray-tracing-validation-at-the-driver-level/
-  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_NV_ray_tracing_validation.html
-  VkPhysicalDeviceRayTracingValidationFeaturesNV validationFeatures = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV};
-  vkSetup.deviceExtensions.push_back({VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME, &validationFeatures, false});
-#endif
-
-  // Create Vulkan context
-  auto vkContext = std::make_unique<VulkanContext>(vkSetup);
-  if(!vkContext->isValid())
-    std::exit(0);
-
-  // Loading the Vulkan extension pointers
-  load_VK_EXTENSIONS(vkContext->getInstance(), vkGetInstanceProcAddr, vkContext->getDevice(), vkGetDeviceProcAddr);
-
-  // Configure application creation
-  appInfo.name                  = fmt::format("{} ({})", PROJECT_NAME, SHADER_LANGUAGE_STR);
-  appInfo.vSync                 = true;
-  appInfo.instance              = vkContext->getInstance();
-  appInfo.device                = vkContext->getDevice();
-  appInfo.physicalDevice        = vkContext->getPhysicalDevice();
-  appInfo.queues                = vkContext->getQueueInfos();
-  appInfo.hasUndockableViewport = true;
-
-  // Create the application
-  auto app = std::make_unique<nvvkhl::Application>(appInfo);
-
-  // Create the test framework
-  auto test = std::make_shared<nvvkhl::ElementBenchmarkParameters>(argc, argv);
-
-#if(VK_HEADER_VERSION >= 283)
-  // Check if ray tracing validation is supported
-  if(validationFeatures.rayTracingValidation == VK_TRUE)
-  {
-    LOGI("Ray tracing validation supported");
-  }
-#endif
-
-  // Add all application elements
-  app->addElement(test);
-  app->addElement(std::make_shared<nvvkhl::ElementCamera>());       // Camera manipulation
-  app->addElement(std::make_shared<nvvkhl::ElementDefaultMenu>());  // Menu / Quit
-  app->addElement(std::make_shared<nvvkhl::ElementDefaultWindowTitle>("", fmt::format("({})", SHADER_LANGUAGE_STR)));  // Window title info
-  app->addElement(std::make_shared<Raytracing>());  // Sample
-
-  app->run();
-  app.reset();
-  vkContext.reset();
-
-  return test->errorCode();
-}
