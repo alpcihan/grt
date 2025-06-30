@@ -110,9 +110,9 @@ private:
         readFloat(densities);
 
         // apply activations
-        auto scalesNormalized = scales;
-        auto rotationsNormalized = rotations;
-        auto densitiesNormalized = densities;
+        auto& scalesNormalized = scales;
+        auto& rotationsNormalized = rotations;
+        auto& densitiesNormalized = densities;
 
         normalize(rotationsNormalized);
         exp(scalesNormalized);

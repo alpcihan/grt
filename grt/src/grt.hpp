@@ -236,14 +236,28 @@ private:
     std::vector<DH::InstanceInfo> inst_info(1);
     inst_info[0].transform = glm::mat4(1.0f);
     inst_info[0].materialID = 0;
+
     m_bInstInfoBuffer = m_alloc->createBuffer(cmd, inst_info, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bInstInfoBuffer.buffer);
+
     m_bAlbedos = m_alloc->createBuffer(cmd, m_model.albedos, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bAlbedos.buffer);
+
     m_bSHCoeffs = m_alloc->createBuffer(cmd, m_model.speculars, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bSHCoeffs.buffer);
+
+    m_bPositions = m_alloc->createBuffer(cmd, m_model.positions, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_dutil->DBG_NAME(m_bPositions.buffer);
+
+    m_bRotations = m_alloc->createBuffer(cmd, m_model.rotations, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_dutil->DBG_NAME(m_bRotations.buffer);
+
+    m_bScales = m_alloc->createBuffer(cmd, m_model.scales, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+    m_dutil->DBG_NAME(m_bScales.buffer);
+
     m_bDensities = m_alloc->createBuffer(cmd, m_model.densities, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bDensities.buffer);
+
     m_app->submitAndWaitTempCmdBuffer(cmd);
   }
 
@@ -378,6 +392,9 @@ private:
     m_rtSet->addBinding(B_skyParam, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_albedos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_shCoeffs, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_positions, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_rotations, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_scales, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_densities, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_instances, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_vertex, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
@@ -508,6 +525,9 @@ private:
     const VkDescriptorBufferInfo dbi_sky{m_bSkyParams.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo albedos_desc{m_bAlbedos.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo shCoeffs_desc{m_bSHCoeffs.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo positions_desc{m_bPositions.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo rotations_desc{m_bRotations.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo scales_desc{m_bScales.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo densities_desc{m_bDensities.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo inst_desc{m_bInstInfoBuffer.buffer, 0, VK_WHOLE_SIZE};
 
@@ -528,6 +548,9 @@ private:
     writes.emplace_back(m_rtSet->makeWrite(0, B_skyParam, &dbi_sky));
     writes.emplace_back(m_rtSet->makeWrite(0, B_albedos, &albedos_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_shCoeffs, &shCoeffs_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_positions, &positions_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_rotations, &rotations_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_scales, &scales_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_densities, &densities_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_instances, &inst_desc));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_vertex, vertex_desc.data()));
@@ -589,6 +612,9 @@ private:
   nvvk::Buffer                 m_bInstInfoBuffer;
   nvvk::Buffer                 m_bAlbedos;
   nvvk::Buffer                 m_bSHCoeffs;
+  nvvk::Buffer                 m_bPositions;
+  nvvk::Buffer                 m_bRotations;
+  nvvk::Buffer                 m_bScales;
   nvvk::Buffer                 m_bDensities;
   nvvk::Buffer                 m_bSkyParams;
 
