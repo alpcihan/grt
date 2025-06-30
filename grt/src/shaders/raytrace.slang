@@ -14,11 +14,11 @@
  [[vk::binding(B_outImage)]] RWTexture2D<float4> outImage;
  [[vk::binding(B_frameInfo)]] ConstantBuffer<FrameInfo> frameInfo;
  [[vk::binding(B_skyParam)]] ConstantBuffer<SimpleSkyParameters> skyInfo;
- //[[vk::binding(B_vertex)]] StructuredBuffer<Vertex> vertices[];
- //[[vk::binding(B_index)]] StructuredBuffer<uint3> indices[];
-
  [[vk::binding(B_albedos)]] StructuredBuffer<float3> albedos;
  [[vk::binding(B_shCoeffs)]] StructuredBuffer<float3> shCoeffs;
+ [[vk::binding(B_positions)]] StructuredBuffer<float3> positions;
+ [[vk::binding(B_rotations)]] StructuredBuffer<float4> rotations;
+ [[vk::binding(B_scales)]] StructuredBuffer<float3> scales;
  [[vk::binding(B_densities)]] StructuredBuffer<float> densities;
  [[vk::binding(B_instances)]] StructuredBuffer<InstanceInfo> instanceInfo;
 
