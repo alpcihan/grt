@@ -182,7 +182,7 @@ private:
     nvh::ScopedTimer st(__FUNCTION__);
     // No mesh/instance creation needed. Camera and material defaults only.
     CameraManip.setClipPlanes({0.1F, 100.0F});
-    CameraManip.setLookat({-0.5F, 0.0F, 5.0F}, {-0.5F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F});
+    CameraManip.setLookat({-0.0F, 0.0F, -5.0F}, {-0.0F, 0.0F, -1.0F}, {0.0F, 1.0F, 0.0F});
     m_pushConst.intensity = 5.0F;
     m_pushConst.maxDepth  = 1;
     m_pushConst.roughness = 0.2F;

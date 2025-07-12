@@ -6,9 +6,10 @@
  #include "device_host.h"
  #include "dh_bindings.h"
  
- #define MISS_DEPTH 1000
- #define MIN_TRANSMITTANCE 0.03
+ #define MISS_DEPTH 10000
+ #define MIN_TRANSMITTANCE 0.03f
  #define KERNEL_DEGREE 4
+ #define SPH_DEGREE 3
  #define MAX_PARTICLE_ALPHA 0.99
  #define MIN_PARTICLE_ALPHA (1.0f/255.0f)
  #define MIN_PARTICLE_KERNEL_DENSITY 0.01
@@ -32,13 +33,9 @@
  // See: https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#example
  struct HitPayload
  {
-    float3 color;
-    float depth;
-    float transmittance;
-   
     float3 radiance;
-    float density;
-    float3 normal;
+    float depth;    
+    float transmittance;
     float hitDistance;
     float rayLastHitDistance;
     float hitCount; // TODO (operel): convert to uint32
@@ -82,11 +79,11 @@
  
    // Initial state
    HitPayload payload;
-   payload.color = float3(0, 0, 0);
+   payload.radiance = float3(0, 0, 0);
    payload.depth = 0;
-   payload.transmittance = 1.0;
+   payload.transmittance = 1.0f;
 
-   while (payload.transmittance > 0.1f && payload.depth < INFINITE) {
+   while (payload.transmittance > MIN_TRANSMITTANCE && payload.depth < INFINITE) {
        TraceRay(topLevelAS, rayFlags, 0xff, 0, 0, 0, ray, payload);
        ray.Origin += ray.Direction * (payload.depth + 10e-9);
    }
@@ -94,7 +91,7 @@
    // -Wpayload-access-perf
    float depth = payload.depth;
 
-   float3 color = payload.color;
+   float3 color = payload.radiance;
    outImage[int2(launchID)] = float4(color, 1.0);
  }
  
@@ -105,21 +102,25 @@
  [shader("closesthit")]
  void rchitMain(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attr)
  {
-   float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
    uint meshID = InstanceID();
    uint primitiveID = PrimitiveIndex();
-
    uint particleIdx = primitiveID / 20; // TODO: This is a hack to get the particle index from the primitive ID.
 
-   // Material info
-   float3 radiance = radianceFromSpH(3, particleIdx, WorldRayDirection(), true);
-
-   float density = densities[particleIdx];
-   density = 0.25f;
-
-   payload.color += payload.transmittance * radiance * density;
-   payload.transmittance *= (1.0f - density);
    payload.depth = RayTCurrent();
+
+   const float hitWeight = processHitFromBuffer(
+        WorldRayOrigin(),
+        WorldRayDirection(),
+        particleIdx,
+        payload.transmittance
+        // payload.depth
+   );
+
+    // Material info
+    if (hitWeight > 0.0f) 
+    {
+        payload.radiance += hitWeight * radianceFromSpH(SPH_DEGREE, particleIdx, WorldRayDirection());
+    }
  }
 
  //-----------------------------------------------------------------------
@@ -137,9 +138,9 @@
  void rmissMain(inout HitPayload payload)
  {
    // float3 sky_color = evalSimpleSky(skyInfo, WorldRayDirection());
-   // payload.color += sky_color * payload.weight;
+   // payload.radiance += sky_color * payload.weight;
 
-   // payload.color = float3(0.0, 0.0, 0.0);
+   // payload.radiance = float3(0.0, 0.0, 0.0);
    // payload.depth = MISS_DEPTH; // Stop
 
    payload.depth = INFINITE;
@@ -148,12 +149,13 @@
 //-----------------------------------------------------------------------
 // Response
 //-----------------------------------------------------------------------
- float processHitFromBuffer<let backToFront : bool>(
+float processHitFromBuffer(
     float3 rayOrigin,
     float3 rayDirection,
     uint32_t particleIdx,
-    inout float transmittance,
-    inout float integratedDepth)
+    inout float transmittance
+    // inout float integratedDepth
+)
 {
     float alpha = 0.0f;
     float depth;
@@ -176,8 +178,9 @@
         hitWeight = integrateHit(
                                 alpha, 
                                 transmittance, 
-                                depth, 
-                                integratedDepth);
+                                depth
+                                //integratedDepth
+                                );
     }
 
     return hitWeight;
@@ -225,7 +228,7 @@ void cannonicalRay(
 
     const float3 rayDirR = mul(parameters.rotationT, rayDirection);
     const float3 grdu    = giscl * rayDirR;
-    particleRayDirection = normalize(grdu);
+    particleRayDirection = safeNormalize(grdu);
 }
 
 float canonicalRayMaxKernelResponse(
@@ -292,11 +295,12 @@ float canonicalRayMinSquaredDistance(
 float integrateHit(
     in float alpha,
     inout float transmittance,
-    in float depth,
-    inout float integratedDepth)
+    in float depth
+    // inout float integratedDepth
+)
 {
     const float weight = alpha * transmittance;
-    integratedDepth += depth * weight;
+    // integratedDepth += depth * weight;
     transmittance *= (1 - alpha);
     return weight; 
 }
@@ -318,6 +322,11 @@ float3x3 rotationMatrixTranspose(float4 quaternion)
     return float3x3(float3((1.f - 2.f * (yy + zz)), 2.f * (xy + rz), 2.f * (xz - ry)),
                     float3(2.f * (xy - rz), (1.f - 2.f * (xx + zz)), 2.f * (yz + rx)),
                     float3(2.f * (xz + ry), 2.f * (yz - rx), (1.f - 2.f * (xx + yy))));
+}
+
+float3 safeNormalize(float3 v, float epsilon = 1e-6)
+{
+    return v / max(length(v), epsilon);
 }
 
  //-----------------------------------------------------------------------
@@ -344,7 +353,7 @@ float3x3 rotationMatrixTranspose(float4 quaternion)
      -0.5900435899266435
  };
 
- float3 radianceFromSpH(int deg, int instanceID, float3 rdir, bool clamped = true)
+ float3 radianceFromSpH(int deg, int instanceID, float3 rdir)
  {
      float3 rad = SH_C0 * albedos[instanceID];
 
@@ -385,7 +394,5 @@ float3x3 rotationMatrixTranspose(float4 quaternion)
          }
      }
 
-     rad += float3(0.5, 0.5, 0.5);
-
-     return clamped ? max(rad, float3(0.0, 0.0, 0.0)) : rad;
+     return max(rad + float3(0.5, 0.5, 0.5), float3(0.0, 0.0, 0.0));
  } 
