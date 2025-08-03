@@ -823,9 +823,9 @@ class Engine3DGRUT:
             scene_scale=scene_scale,
             device=self.device
         )
-        self.primitives.add_primitive(
-            geometry_type='Sphere', primitive_type=OptixPrimitiveTypes.GLASS, device=self.device
-        )
+        # self.primitives.add_primitive(
+        #    geometry_type='Sphere', primitive_type=OptixPrimitiveTypes.GLASS, device=self.device
+        #)
         self.rebuild_bvh(self.scene_mog)
 
         self.last_state = dict(

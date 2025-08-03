@@ -105,6 +105,9 @@ extern "C" __global__ void __raygen__rg() {
     if ((idx.x > params.frameBounds.x) || (idx.y > params.frameBounds.y)) {
         return;
     }
+    if(idx.x + idx.y + idx.z == 0) {
+        printf("e!");
+    }
 
     float3 rayOrigin    = params.rayWorldOrigin(idx);
     float3 rayDirection = params.rayWorldDirection(idx);

@@ -3,7 +3,7 @@ import numpy as np
 import struct
 
 # Path to your .pt file
-pt_path = "/home/alp/Desktop/3dgrut/runs/lego-1306_174837/ckpt_last.pt"
+pt_path = "/home/alp/Desktop/grt/3dgrut/runs/icosahedron_lego/ckpt_last.pt"
 
 # Load the .pt file
 data = torch.load(pt_path, map_location='cpu')

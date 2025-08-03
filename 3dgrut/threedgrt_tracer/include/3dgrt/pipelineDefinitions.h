@@ -24,15 +24,15 @@ enum MOGRenderOpts {
 };
 
 enum MOGPrimitiveTypes {
-    MOGTracingIcosaHedron,
-    MOGTracingOctraHedron,
-    MOGTracingTetraHedron,
-    MOGTracingDiamond,
-    MOGTracingSphere,
-    MOGTracingCustom,
-    MOGTracingTriHexa,
-    MOGTracingTriSurfel,
-    MOGTracingInstances,
+    MOGTracingIcosaHedron = 0,
+    MOGTracingOctraHedron = 1,
+    MOGTracingTetraHedron = 2,
+    MOGTracingDiamond     = 3,
+    MOGTracingSphere      = 4,
+    MOGTracingCustom      = 5,
+    MOGTracingTriHexa     = 6,
+    MOGTracingTriSurfel   = 7,
+    MOGTracingInstances   = 8,
 };
 
 enum MOGTracingPipeline {
