@@ -34,5 +34,6 @@
 #define B_instances 11
 #define B_vertex 12
 #define B_index 13
+#define B_arbitraryBuffer 14
 
 #endif  // !BINDINGS_H

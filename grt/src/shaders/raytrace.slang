@@ -27,6 +27,7 @@
  [[vk::binding(B_scales)]] StructuredBuffer<float3> scales;
  [[vk::binding(B_densities)]] StructuredBuffer<float> densities;
  [[vk::binding(B_instances)]] StructuredBuffer<InstanceInfo> instanceInfo;
+[[vk::binding(B_arbitraryBuffer)]] RWStructuredBuffer<float> arbitraryBuffer;
 
  //-----------------------------------------------------------------------
  // Payload 
@@ -65,6 +66,13 @@
  {
    float2 launchID = (float2)DispatchRaysIndex().xy;
    float2 launchSize = (float2)DispatchRaysDimensions().xy;
+
+   // Write to arbitrary buffer (using a simple pattern based on pixel coordinates)
+   uint bufferIndex = (uint(launchID.x) + uint(launchID.y) * uint(launchSize.x)) % 64;
+   if (bufferIndex < 64)
+   {
+     arbitraryBuffer[bufferIndex] = float(bufferIndex) * 2.0f + sin(launchID.x * 0.1f) * 10.0f;
+   }
 
    const uint rayFlags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
    const float2 clipCoords = (launchID + 0.5) / launchSize * 2.0 - 1.0;

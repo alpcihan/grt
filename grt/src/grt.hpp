@@ -157,9 +157,35 @@ public:
     const std::array<VkStridedDeviceAddressRegionKHR, 4>& bindingTables = m_sbt.getRegions();
     const VkExtent2D&                                     size          = m_app->getViewportSize();
     vkCmdTraceRaysKHR(cmd, &bindingTables[0], &bindingTables[1], &bindingTables[2], &bindingTables[3], size.width, size.height, 1);
+
+    // Read back data from arbitrary buffer (after rendering)
+    VkMemoryBarrier readBarrier{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    };
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &readBarrier, 0, nullptr, 0, nullptr);
+    readArbitraryBuffer();
   }
 
 private:
+  void readArbitraryBuffer()
+  {
+    // Map and read the buffer data
+    float* bufferData = reinterpret_cast<float*>(m_alloc->map(m_bArbitraryBuffer));
+    if (bufferData)
+    {
+      // Print first few values for demonstration
+      printf("Arbitrary buffer values: ");
+      for (int i = 0; i < 10 && i < 64; ++i)
+      {
+        printf("%.2f ", bufferData[i]);
+      }
+      printf("\n");
+      m_alloc->unmap(m_bArbitraryBuffer);
+    }
+  }
+
   void createScene()
   {
     nvh::ScopedTimer st(__FUNCTION__);
@@ -240,6 +266,13 @@ private:
 
     m_bDensities = m_alloc->createBuffer(cmd, m_model.densities, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
     m_dutil->DBG_NAME(m_bDensities.buffer);
+
+    // Create arbitrary buffer (64 floats) with host-visible memory for readback
+    std::vector<float> arbitraryData(64, 0.0f);  // Initialize with zeros
+    m_bArbitraryBuffer = m_alloc->createBuffer(cmd, arbitraryData, 
+                                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    m_dutil->DBG_NAME(m_bArbitraryBuffer.buffer);
 
     m_app->submitAndWaitTempCmdBuffer(cmd);
   }
@@ -380,6 +413,7 @@ private:
     m_rtSet->addBinding(B_scales, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_densities, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_instances, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
+    m_rtSet->addBinding(B_arbitraryBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_vertex, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
     m_rtSet->addBinding(B_index, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)m_bMeshes.size(), VK_SHADER_STAGE_ALL);
     m_rtSet->initLayout();
@@ -502,6 +536,7 @@ private:
     const VkDescriptorBufferInfo scales_desc{m_bScales.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo densities_desc{m_bDensities.buffer, 0, VK_WHOLE_SIZE};
     const VkDescriptorBufferInfo inst_desc{m_bInstInfoBuffer.buffer, 0, VK_WHOLE_SIZE};
+    const VkDescriptorBufferInfo arbitrary_desc{m_bArbitraryBuffer.buffer, 0, VK_WHOLE_SIZE};
 
     std::vector<VkDescriptorBufferInfo> vertex_desc;
     std::vector<VkDescriptorBufferInfo> index_desc;
@@ -525,6 +560,7 @@ private:
     writes.emplace_back(m_rtSet->makeWrite(0, B_scales, &scales_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_densities, &densities_desc));
     writes.emplace_back(m_rtSet->makeWrite(0, B_instances, &inst_desc));
+    writes.emplace_back(m_rtSet->makeWrite(0, B_arbitraryBuffer, &arbitrary_desc));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_vertex, vertex_desc.data()));
     writes.emplace_back(m_rtSet->makeWriteArray(0, B_index, index_desc.data()));
 
@@ -544,6 +580,7 @@ private:
     m_alloc->destroy(m_bSHCoeffs);
     m_alloc->destroy(m_bDensities);
     m_alloc->destroy(m_bSkyParams);
+    m_alloc->destroy(m_bArbitraryBuffer);
 
     m_rtSet->deinit();
     m_gBuffers.reset();
@@ -589,6 +626,7 @@ private:
   nvvk::Buffer                 m_bScales;
   nvvk::Buffer                 m_bDensities;
   nvvk::Buffer                 m_bSkyParams;
+  nvvk::Buffer                 m_bArbitraryBuffer;
 
   std::vector<nvvk::AccelKHR> m_blas;  // Bottom-level AS
   nvvk::AccelKHR              m_tlas;  // Top-level AS
