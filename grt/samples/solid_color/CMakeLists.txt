@@ -1,8 +1,0 @@
-
-set(SHD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
-
-create_project(solid_color
-  SOURCES 
-    solid_color.cpp
-)
-
