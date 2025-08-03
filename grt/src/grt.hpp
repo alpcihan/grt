@@ -31,23 +31,7 @@ using namespace glm;
 }  // namespace DH
 
 // Local shaders
-#if USE_HLSL
-#include "_autogen/raytrace_rgenMain.spirv.h"
-#include "_autogen/raytrace_rchitMain.spirv.h"
-#include "_autogen/raytrace_rmissMain.spirv.h"
-const auto& rgen_shd  = std::vector<char>{std::begin(raytrace_rgenMain), std::end(raytrace_rgenMain)};
-const auto& rchit_shd = std::vector<char>{std::begin(raytrace_rchitMain), std::end(raytrace_rchitMain)};
-const auto& rmiss_shd = std::vector<char>{std::begin(raytrace_rmissMain), std::end(raytrace_rmissMain)};
-#elif USE_SLANG
 #include "_autogen/raytrace_slang.h"
-#else
-#include "_autogen/raytrace.rchit.glsl.h"
-#include "_autogen/raytrace.rgen.glsl.h"
-#include "_autogen/raytrace.rmiss.glsl.h"
-const auto& rgen_shd  = std::vector<uint32_t>{std::begin(raytrace_rgen_glsl), std::end(raytrace_rgen_glsl)};
-const auto& rchit_shd = std::vector<uint32_t>{std::begin(raytrace_rchit_glsl), std::end(raytrace_rchit_glsl)};
-const auto& rmiss_shd = std::vector<uint32_t>{std::begin(raytrace_rmiss_glsl), std::end(raytrace_rmiss_glsl)};
-#endif
 
 uint32_t MAXRAYRECURSIONDEPTH = 10;
 
@@ -158,7 +142,6 @@ public:
                                            CameraManip.getClipPlanes().x, CameraManip.getClipPlanes().y);
     proj[1][1] *= -1;  // Vulkan has it inverted
 
-    // Update uniform buffers
     DH::FrameInfo finfo{.projInv = glm::inverse(proj), .viewInv = glm::inverse(CameraManip.getMatrix())};
     vkCmdUpdateBuffer(cmd, m_bFrameInfo.buffer, 0, sizeof(DH::FrameInfo), &finfo);  // Update FrameInfo
     vkCmdUpdateBuffer(cmd, m_bSkyParams.buffer, 0, sizeof(nvvkhl_shaders::SimpleSkyParameters), &m_skyParams);  // Update the sky
@@ -182,7 +165,7 @@ private:
     nvh::ScopedTimer st(__FUNCTION__);
     // No mesh/instance creation needed. Camera and material defaults only.
     CameraManip.setClipPlanes({0.1F, 100.0F});
-    CameraManip.setLookat({-0.0F, 0.0F, -5.0F}, {-0.0F, 0.0F, -1.0F}, {0.0F, 1.0F, 0.0F});
+    CameraManip.setLookat({0.0F, 0.0F, 3.0F}, {0.0F, 0.0F, -1.0F}, {0.0F, 1.0F, 0.0F});
     m_pushConst.intensity = 5.0F;
     m_pushConst.maxDepth  = 1;
     m_pushConst.roughness = 0.2F;
@@ -417,7 +400,7 @@ private:
     std::array<VkPipelineShaderStageCreateInfo, eShaderGroupCount> stages{};
     for(auto& s : stages)
       s.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-#if USE_SLANG
+
     VkShaderModule shaderModule = nvvk::createShaderModule(m_device, &raytraceSlang[0], sizeof(raytraceSlang));
     stages[eRaygen].module      = shaderModule;
     stages[eRaygen].pName       = "rgenMain";
@@ -431,17 +414,6 @@ private:
     stages[eAnyHit].module      = shaderModule;
     stages[eAnyHit].pName       = "rahitMain";
     stages[eAnyHit].stage       = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-#else
-    stages[eRaygen].module     = nvvk::createShaderModule(m_device, rgen_shd);
-    stages[eRaygen].pName      = USE_HLSL ? "rgenMain" : "main";
-    stages[eRaygen].stage      = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-    stages[eMiss].module       = nvvk::createShaderModule(m_device, rmiss_shd);
-    stages[eMiss].pName        = USE_HLSL ? "rmissMain" : "main";
-    stages[eMiss].stage        = VK_SHADER_STAGE_MISS_BIT_KHR;
-    stages[eClosestHit].module = nvvk::createShaderModule(m_device, rchit_shd);
-    stages[eClosestHit].pName  = USE_HLSL ? "rchitMain" : "main";
-    stages[eClosestHit].stage  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-#endif
 
     m_dutil->setObjectName(stages[eRaygen].module, "Raygen");
     m_dutil->setObjectName(stages[eMiss].module, "Miss");
