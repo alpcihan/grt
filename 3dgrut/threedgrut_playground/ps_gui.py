@@ -141,11 +141,11 @@ class Playground:
             window_w, window_h = ps.get_window_size()
 
         # Update polyscope camera with params from gui
+        
         view_params = ps.CameraParameters(
             ps.CameraIntrinsics(fov_vertical_deg=self.engine.camera_fov, aspect=window_w / window_h),
             ps.get_view_camera_parameters().get_extrinsics()
         )
-        ps.set_view_camera_parameters(view_params)
 
         # If window size changed since the last render call, mark the canvas as dirty.
         # We check it here since the event comes from the windowing system and could prompt in between frame renders
@@ -154,7 +154,17 @@ class Playground:
             if (last_window_size[0] != window_h) or (last_window_size[1] != window_w):
                 self.is_force_canvas_dirty = True
 
-        camera = polyscope_to_kaolin_camera(view_params, window_w, window_h, device=self.engine.device)
+        # DEBUG: manual view
+        view_mat = view_params.get_view_mat()
+
+        if True:
+            view_mat = np.array([[1, 0, 0,  0.0],
+                                 [0, 1, 0,  0.0],
+                                 [0, 0, 1, -3.0],
+                                 [0, 0, 0,  1.0]
+                                ])
+
+        camera = polyscope_to_kaolin_camera(view_params, view_mat, window_w, window_h, device=self.engine.device)
         is_first_pass = self.is_dirty(camera)
         if not is_first_pass and not self.engine.has_progressive_effects_to_render():
             return self.engine.last_state['rgb'], self.engine.last_state['opacity']

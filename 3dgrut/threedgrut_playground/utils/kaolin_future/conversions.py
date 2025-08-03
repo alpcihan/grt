@@ -26,6 +26,7 @@ As of March 26, 2025 the latest public release is kaolin 0.17.0, hence it's incl
 
 def polyscope_to_kaolin_camera(
     ps_camera: ps.core.CameraParameters,
+    view_matrix: np.ndarray,
     width: int,
     height: int,
     near: float = 1e-2,
@@ -48,7 +49,6 @@ def polyscope_to_kaolin_camera(
         (kaolin.render.camera.Camera):
             A kaolin camera object.
     """
-    view_matrix = ps_camera.get_view_mat()
     fov_y = ps_camera.get_fov_vertical_deg() * np.pi / 180.0    # to radians
     return Camera.from_args(
         view_matrix=view_matrix,

@@ -105,12 +105,15 @@ extern "C" __global__ void __raygen__rg() {
     if ((idx.x > params.frameBounds.x) || (idx.y > params.frameBounds.y)) {
         return;
     }
-    if(idx.x + idx.y + idx.z == 0) {
-        printf("e!");
-    }
+ 
 
     float3 rayOrigin    = params.rayWorldOrigin(idx);
     float3 rayDirection = params.rayWorldDirection(idx);
+
+    if(idx.x + idx.y + idx.z == 0) {
+        printf("O: %f %f %f\n",rayOrigin.x, rayOrigin.y, rayOrigin.z);
+        printf("D: %f %f %f\n",rayDirection.x, rayDirection.y, rayDirection.z);
+    }
 
     float3 rayRadiance     = make_float3(0.0f);
     float rayTransmittance = 1.0f;
